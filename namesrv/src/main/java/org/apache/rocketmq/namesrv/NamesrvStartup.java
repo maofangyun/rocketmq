@@ -51,10 +51,13 @@ public class NamesrvStartup {
         main0(args);
     }
 
+    //NameServer启动的入口类
     public static NamesrvController main0(String[] args) {
 
         try {
+            //根据NameServer启动时，传入的参数，创建NamesrvController
             NamesrvController controller = createNamesrvController(args);
+            //初始化传入的NamesrvController，启动NamesrvController
             start(controller);
             String tip = "The Name Server boot success. serializeType=" + RemotingCommand.getSerializeTypeConfigInThisServer();
             log.info(tip);
@@ -123,9 +126,11 @@ public class NamesrvStartup {
         MixAll.printObjectProperties(log, namesrvConfig);
         MixAll.printObjectProperties(log, nettyServerConfig);
 
+        //根据前面的一系列代码，填充namesrvConfig，nettyServerConfig，此处真正创建NamesrvController
         final NamesrvController controller = new NamesrvController(namesrvConfig, nettyServerConfig);
 
         // remember all configs to prevent discard
+        //NamesrvController保存了所有的配置信息
         controller.getConfiguration().registerConfig(properties);
 
         return controller;
@@ -136,13 +141,14 @@ public class NamesrvStartup {
         if (null == controller) {
             throw new IllegalArgumentException("NamesrvController is null");
         }
-
+        //初始化NamesrvController
         boolean initResult = controller.initialize();
         if (!initResult) {
             controller.shutdown();
             System.exit(-3);
         }
 
+        //注册JVM的钩子函数，关闭时调用
         Runtime.getRuntime().addShutdownHook(new ShutdownHookThread(log, new Callable<Void>() {
             @Override
             public Void call() throws Exception {
@@ -151,6 +157,7 @@ public class NamesrvStartup {
             }
         }));
 
+        //启动初始化NamesrvController
         controller.start();
 
         return controller;

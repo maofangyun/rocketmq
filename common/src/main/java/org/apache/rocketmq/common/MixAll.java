@@ -327,6 +327,7 @@ public class MixAll {
     public static void properties2Object(final Properties p, final Object object) {
         Method[] methods = object.getClass().getMethods();
         for (Method method : methods) {
+            //setKvConfigPath
             String mn = method.getName();
             if (mn.startsWith("set")) {
                 try {
