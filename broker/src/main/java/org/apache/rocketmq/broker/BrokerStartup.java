@@ -217,6 +217,7 @@ public class BrokerStartup {
                 nettyClientConfig,
                 messageStoreConfig);
             // remember all configs to prevent discard
+            // 存储输入的全部配置信息
             controller.getConfiguration().registerConfig(properties);
 
             boolean initResult = controller.initialize();
