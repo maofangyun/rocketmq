@@ -886,7 +886,7 @@ public class BrokerController {
             handleSlaveSynchronize(messageStoreConfig.getBrokerRole());
             this.registerBrokerAll(true, false, true);
         }
-
+        //TODO 是broker定期向nameserver发送broker上所有topic的注册信息？
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override

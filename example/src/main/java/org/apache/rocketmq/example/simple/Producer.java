@@ -25,7 +25,7 @@ import org.apache.rocketmq.remoting.common.RemotingHelper;
 public class Producer {
     public static void main(String[] args) throws MQClientException, InterruptedException {
 
-        // 相同的ProducerGroup不同的producer是否会在producerTable中只存储一个？
+        // 相同的ProducerGroup不同的producer是否会在producerTable中只存储一个？会报错MQClientException
         DefaultMQProducer producer = new DefaultMQProducer("ProducerGroupName");
         producer.start();
 

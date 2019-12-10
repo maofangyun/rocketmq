@@ -139,7 +139,7 @@ public class BrokerStartup {
                     in.close();
                 }
             }
-
+            //将所有的输入配置信息保存到brokerConfig
             MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), brokerConfig);
 
             if (null == brokerConfig.getRocketmqHome()) {
@@ -161,7 +161,7 @@ public class BrokerStartup {
                     System.exit(-3);
                 }
             }
-
+            //设置broker的角色ID
             switch (messageStoreConfig.getBrokerRole()) {
                 case ASYNC_MASTER:
                 case SYNC_MASTER:
@@ -211,6 +211,7 @@ public class BrokerStartup {
             MixAll.printObjectProperties(log, nettyClientConfig);
             MixAll.printObjectProperties(log, messageStoreConfig);
 
+            //根据配置信息，创建得到BrokerController
             final BrokerController controller = new BrokerController(
                 brokerConfig,
                 nettyServerConfig,
