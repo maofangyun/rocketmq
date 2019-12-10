@@ -1774,6 +1774,7 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    //用来更新ConsumeQueue中消息偏移的
     class ReputMessageService extends ServiceThread {
 
         private volatile long reputFromOffset = 0;
