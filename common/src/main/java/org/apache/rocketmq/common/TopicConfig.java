@@ -23,6 +23,11 @@ public class TopicConfig {
     public static int defaultReadQueueNums = 16;
     public static int defaultWriteQueueNums = 16;
     private String topicName;
+    /**
+     * 读写队列其实是个逻辑概念，一个broker下topic的总队列数是以写队列为准，
+     * 而读队列意思是允许多少队列可以被消费者消费，也就是说读多写少的情况下，
+     * 没有问题，队列都可以被消费掉，如果写多读少的话，那么就会存在队列不会被消费的情况。
+     * */
     private int readQueueNums = defaultReadQueueNums;
     private int writeQueueNums = defaultWriteQueueNums;
     private int perm = PermName.PERM_READ | PermName.PERM_WRITE;

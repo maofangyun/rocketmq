@@ -235,9 +235,10 @@ public class MQClientInstance {
                     }
                     // Start request-response channel
                     this.mQClientAPIImpl.start();
-                    // Start various schedule tasks
+                    // Start various schedule tasks(其中就包括定时的从NameServer中更新生产者和消费者的TopicRouteInfo缓存)
                     this.startScheduledTask();
                     // Start pull service
+                    // 线程的run方法中死循环做守护
                     this.pullMessageService.start();
                     // Start rebalance service
                     this.rebalanceService.start();
@@ -269,6 +270,7 @@ public class MQClientInstance {
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
 
+        //每隔30s，从NameServer中更新TopicRouteInfo
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -604,6 +606,10 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * 此处更新TopicRouteInfo，当isDefault=true时，使用默认的主题TBW102获取TopicRouteData
+     * 若NameServer中获取的TopicRouteData和本地缓存topicRouteTable中的不一致，则更新
+     * */
     public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
         DefaultMQProducer defaultMQProducer) {
         try {
@@ -639,8 +645,9 @@ public class MQClientInstance {
                                 this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());
                             }
 
-                            // Update Pub info
+                            // Update Pub info  生产者
                             {
+                                //将TopicRouteData转换成为TopicPublishInfo
                                 TopicPublishInfo publishInfo = topicRouteData2TopicPublishInfo(topic, topicRouteData);
                                 publishInfo.setHaveTopicRouterInfo(true);
                                 Iterator<Entry<String, MQProducerInner>> it = this.producerTable.entrySet().iterator();
@@ -648,12 +655,13 @@ public class MQClientInstance {
                                     Entry<String, MQProducerInner> entry = it.next();
                                     MQProducerInner impl = entry.getValue();
                                     if (impl != null) {
+                                        //更新生产者中的topic信息缓存表topicPublishInfoTable
                                         impl.updateTopicPublishInfo(topic, publishInfo);
                                     }
                                 }
                             }
 
-                            // Update sub info
+                            // Update sub info     消费者
                             {
                                 Set<MessageQueue> subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);
                                 Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();

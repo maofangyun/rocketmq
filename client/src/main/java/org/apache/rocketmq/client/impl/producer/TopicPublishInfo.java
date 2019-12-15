@@ -66,6 +66,8 @@ public class TopicPublishInfo {
         this.haveTopicRouterInfo = haveTopicRouterInfo;
     }
 
+    //考虑broker宕机的情况，由于NameServer不会实时的删除宕机的broker信息，
+    //导致从NameServer中获取的topic信息仍然包含宕机的broker，所以每次发送的消息，都会有几率的发送到宕机的broker上，导致消息的重试
     public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
         if (lastBrokerName == null) {
             return selectOneMessageQueue();

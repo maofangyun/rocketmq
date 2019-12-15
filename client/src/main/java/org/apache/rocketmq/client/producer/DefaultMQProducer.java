@@ -41,6 +41,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.remoting.RPCHook;
 import org.apache.rocketmq.remoting.exception.RemotingException;
+import org.apache.rocketmq.remoting.netty.NettyRemotingClient;
 
 /**
  * This class is the entry point for applications intending to send messages. </p>
@@ -72,8 +73,9 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     private String producerGroup;
 
     /**
-     * Just for testing or demo program
-     */
+     * 默认的topic,若autoCreateTopicEnable = true,首次则通过默认的AUTO_CREATE_TOPIC_KEY_TOPIC主题从nameServer中获取broker的相关信息，
+     * 然后broker中生成要创建的topic信息，并注册到nameServer
+     * */
     private String createTopicKey = MixAll.AUTO_CREATE_TOPIC_KEY_TOPIC;
 
     /**

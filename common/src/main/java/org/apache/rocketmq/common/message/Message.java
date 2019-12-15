@@ -22,12 +22,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+//Message只包含topic，broker和queueID由负载均衡算法计算得到
 public class Message implements Serializable {
     private static final long serialVersionUID = 8445773977080406428L;
 
     private String topic;
     private int flag;
-    private Map<String, String> properties;
+    private Map<String, String> properties;     //keys存储在properties中，key就是KEYS
     private byte[] body;
     private String transactionId;
 
