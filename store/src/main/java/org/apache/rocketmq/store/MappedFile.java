@@ -49,7 +49,9 @@ public class MappedFile extends ReferenceResource {
 
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
+    //当前文件的提交指针
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
+    //已经提交(已经持久化到磁盘)的位置
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
     protected int fileSize;
     protected FileChannel fileChannel;
@@ -59,6 +61,7 @@ public class MappedFile extends ReferenceResource {
     protected ByteBuffer writeBuffer = null;
     protected TransientStorePool transientStorePool = null;
     private String fileName;
+    //commitlog文件的名称，即每个commitlog文件的起始偏移量
     private long fileFromOffset;
     private File file;
     private MappedByteBuffer mappedByteBuffer;

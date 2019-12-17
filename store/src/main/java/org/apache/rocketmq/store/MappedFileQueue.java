@@ -37,6 +37,7 @@ public class MappedFileQueue {
 
     private final String storePath;
 
+    //默认1024*1024*1024
     private final int mappedFileSize;
 
     private final CopyOnWriteArrayList<MappedFile> mappedFiles = new CopyOnWriteArrayList<MappedFile>();
