@@ -629,6 +629,7 @@ public class CommitLog {
                 case END_OF_FILE:
                     unlockMappedFile = mappedFile;
                     // Create a new file, re-write the message
+                    // 根据END_OF_FILE，此mappedFile的剩余空间不足以存放消息，需要新建一个mappedFile
                     mappedFile = this.mappedFileQueue.getLastMappedFile(0);
                     if (null == mappedFile) {
                         // XXX: warn and notify me
