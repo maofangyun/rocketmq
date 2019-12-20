@@ -168,6 +168,7 @@ public class MQClientInstance {
                 String[] item = broker.split(":");
                 int nums = Integer.parseInt(item[1]);
                 for (int i = 0; i < nums; i++) {
+                    //MessageQueue的ID在这里指定，NameServer中没有MessageQueue的ID信息
                     MessageQueue mq = new MessageQueue(topic, item[0], i);
                     info.getMessageQueueList().add(mq);
                 }
