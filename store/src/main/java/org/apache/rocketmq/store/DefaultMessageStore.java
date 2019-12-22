@@ -351,6 +351,7 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    // 将消息写入缓冲区
     public PutMessageResult putMessage(MessageExtBrokerInner msg) {
         if (this.shutdown) {
             log.warn("message store has shutdown, so putMessage is forbidden");
@@ -392,6 +393,7 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         long beginTime = this.getSystemClock().now();
+        // 一系列验证通过之后，消息在此处写入缓冲区
         PutMessageResult result = this.commitLog.putMessage(msg);
 
         long elapsedTime = this.getSystemClock().now() - beginTime;
@@ -448,6 +450,7 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         long beginTime = this.getSystemClock().now();
+        // 一系列验证通过之后，消息在此处写入缓冲区
         PutMessageResult result = this.commitLog.putMessages(messageExtBatch);
 
         long elapsedTime = this.getSystemClock().now() - beginTime;
@@ -1419,6 +1422,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     public void doDispatch(DispatchRequest req) {
+        // 循环遍历所有的转发器，调用其转发的方法
         for (CommitLogDispatcher dispatcher : this.dispatcherList) {
             dispatcher.dispatch(req);
         }
@@ -1478,6 +1482,7 @@ public class DefaultMessageStore implements MessageStore {
         }, 6, TimeUnit.SECONDS);
     }
 
+    // 转发消息到ConsumeQueue的方法
     class CommitLogDispatcherBuildConsumeQueue implements CommitLogDispatcher {
 
         @Override
@@ -1750,6 +1755,7 @@ public class DefaultMessageStore implements MessageStore {
 
             while (!this.isStopped()) {
                 try {
+                    // 间隔时间1s
                     int interval = DefaultMessageStore.this.getMessageStoreConfig().getFlushIntervalConsumeQueue();
                     this.waitForRunning(interval);
                     this.doFlush(1);
@@ -1818,6 +1824,7 @@ public class DefaultMessageStore implements MessageStore {
                     this.reputFromOffset, DefaultMessageStore.this.commitLog.getMinOffset());
                 this.reputFromOffset = DefaultMessageStore.this.commitLog.getMinOffset();
             }
+            // reputFromOffset要大于commitLog.getMinOffset()，小于commitLog.getMaxOffset()
             for (boolean doNext = true; this.isCommitLogAvailable() && doNext; ) {
 
                 if (DefaultMessageStore.this.getMessageStoreConfig().isDuplicationEnable()
@@ -1828,8 +1835,10 @@ public class DefaultMessageStore implements MessageStore {
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
+                        // 和前面的没变，还是在commitlog中的物理偏移量
                         this.reputFromOffset = result.getStartOffset();
 
+                        // result.getSize()表示消息一共有多少字节
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
@@ -1837,6 +1846,7 @@ public class DefaultMessageStore implements MessageStore {
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+                                    // 此处进行转发
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
@@ -1888,6 +1898,7 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         @Override
+        // 死循环，分发消息到consumeQueue和indexFile中
         public void run() {
             DefaultMessageStore.log.info(this.getServiceName() + " service started");
 

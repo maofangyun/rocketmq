@@ -44,7 +44,9 @@ public class MappedFileQueue {
 
     private final AllocateMappedFileService allocateMappedFileService;
 
+    //表示某一个commitlog中数据写入的位置(是个累加量) committedWhere <= flushedWhere
     private long flushedWhere = 0;
+    //由于永远只会有一个commitlog被使用，也就是说只有一个MappedFile被启用，则此属性表示mappedFile写入的数据位置(是个累加量)
     private long committedWhere = 0;
 
     private volatile long storeTimestamp = 0;
@@ -446,11 +448,15 @@ public class MappedFileQueue {
         return result;
     }
 
+    // 若返回fasle，证明有数据被提交了
     public boolean commit(final int commitLeastPages) {
         boolean result = true;
+        // 根据偏移量获取应该要写入的mappedFile
         MappedFile mappedFile = this.findMappedFileByOffset(this.committedWhere, this.committedWhere == 0);
         if (mappedFile != null) {
+            // 返回的是当前mappedFile中的偏移量(不是累加量)
             int offset = mappedFile.commit(commitLeastPages);
+            // 此处才是mappedfile中所有消息的累加偏移量
             long where = mappedFile.getFileFromOffset() + offset;
             result = where == this.committedWhere;
             this.committedWhere = where;
@@ -471,6 +477,7 @@ public class MappedFileQueue {
             MappedFile firstMappedFile = this.getFirstMappedFile();
             MappedFile lastMappedFile = this.getLastMappedFile();
             if (firstMappedFile != null && lastMappedFile != null) {
+                // 判断offset是否在mappedfile的偏移量范围内
                 if (offset < firstMappedFile.getFileFromOffset() || offset >= lastMappedFile.getFileFromOffset() + this.mappedFileSize) {
                     LOG_ERROR.warn("Offset not matched. Request offset: {}, firstOffset: {}, lastOffset: {}, mappedFileSize: {}, mappedFiles count: {}",
                         offset,
@@ -479,6 +486,7 @@ public class MappedFileQueue {
                         this.mappedFileSize,
                         this.mappedFiles.size());
                 } else {
+                    // 计算mappedFiles中的下标
                     int index = (int) ((offset / this.mappedFileSize) - (firstMappedFile.getFileFromOffset() / this.mappedFileSize));
                     MappedFile targetFile = null;
                     try {
@@ -486,11 +494,13 @@ public class MappedFileQueue {
                     } catch (Exception ignored) {
                     }
 
+                    // 再次判断offset是否在targetFile的偏移量范围内
                     if (targetFile != null && offset >= targetFile.getFileFromOffset()
                         && offset < targetFile.getFileFromOffset() + this.mappedFileSize) {
                         return targetFile;
                     }
 
+                    // 若上一步判断为否，直接暴力循环做对比
                     for (MappedFile tmpMappedFile : this.mappedFiles) {
                         if (offset >= tmpMappedFile.getFileFromOffset()
                             && offset < tmpMappedFile.getFileFromOffset() + this.mappedFileSize) {
@@ -499,6 +509,7 @@ public class MappedFileQueue {
                     }
                 }
 
+                // 若还是没有发现，且returnFirstOnNotFound=true，返回第一个MappedFile
                 if (returnFirstOnNotFound) {
                     return firstMappedFile;
                 }

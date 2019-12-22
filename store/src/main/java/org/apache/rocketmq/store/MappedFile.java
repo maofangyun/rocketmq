@@ -49,16 +49,19 @@ public class MappedFile extends ReferenceResource {
 
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
-    //当前文件的提交指针
+    //当前文件的提交指针 commitedPosition <= flushedPosition <= fileSize
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
     //已经提交(已经持久化到磁盘)的位置
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
+    //1024*1024*1024
     protected int fileSize;
     protected FileChannel fileChannel;
     /**
      * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
      */
     protected ByteBuffer writeBuffer = null;
+    //内存池的优势是集中管理内存的分配和释放，同时提高分配和释放内存的性能，
+    // 很多框架会先预先申请一大块内存，然后通过提供响应的分配 和释放接口来使用内存，这样系统的性能也会打打提高。
     protected TransientStorePool transientStorePool = null;
     private String fileName;
     //commitlog文件的名称，即每个commitlog文件的起始偏移量
@@ -273,8 +276,10 @@ public class MappedFile extends ReferenceResource {
     /**
      * @return The current flushed position
      */
+    // 刷盘，将数据写入Commitlog文件中
     public int flush(final int flushLeastPages) {
         if (this.isAbleToFlush(flushLeastPages)) {
+            // 此处有同步，this.hold()获取锁，this.release()释放锁
             if (this.hold()) {
                 int value = getReadPosition();
 
@@ -299,12 +304,16 @@ public class MappedFile extends ReferenceResource {
         return this.getFlushedPosition();
     }
 
+    // 提交数据，并返回提交指针
+    // commit()方法的作用就是将MappedFile的writeBuffer中的数据提交到文件通道fileChannel
     public int commit(final int commitLeastPages) {
+        //首先判断是否开启了堆外内存
         if (writeBuffer == null) {
             //no need to commit data to file channel, so just regard wrotePosition as committedPosition.
             return this.wrotePosition.get();
         }
         if (this.isAbleToCommit(commitLeastPages)) {
+            //此处有同步，this.hold()获取锁，this.release()释放锁
             if (this.hold()) {
                 commit0(commitLeastPages);
                 this.release();
@@ -318,7 +327,7 @@ public class MappedFile extends ReferenceResource {
             this.transientStorePool.returnBuffer(writeBuffer);
             this.writeBuffer = null;
         }
-
+        // 更新committedPosition的操作在commit0()中完成
         return this.committedPosition.get();
     }
 
@@ -333,6 +342,7 @@ public class MappedFile extends ReferenceResource {
                 byteBuffer.limit(writePos);
                 this.fileChannel.position(lastCommittedPosition);
                 this.fileChannel.write(byteBuffer);
+                //写入fileChannel之后完成committedPosition的更新
                 this.committedPosition.set(writePos);
             } catch (Throwable e) {
                 log.error("Error occurred when commit data to FileChannel.", e);
@@ -364,9 +374,10 @@ public class MappedFile extends ReferenceResource {
         }
 
         if (commitLeastPages > 0) {
+            //保证按页来提交，默认最少是4
             return ((write / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE)) >= commitLeastPages;
         }
-
+        //commitLeastPages<0,表示只要脏页存在就提交
         return write > flush;
     }
 

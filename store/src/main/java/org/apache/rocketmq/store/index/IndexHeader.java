@@ -109,6 +109,7 @@ public class IndexHeader {
         this.byteBuffer.putInt(hashSlotcountIndex, value);
     }
 
+    // index条目(2000W)中已经使用的数量
     public int getIndexCount() {
         return indexCount.get();
     }

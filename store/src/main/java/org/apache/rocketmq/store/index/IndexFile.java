@@ -89,10 +89,13 @@ public class IndexFile {
         return this.mappedFile.destroy(intervalForcibly);
     }
 
+    // 将消息的key和消息在commitlog文件中的偏移量的对应关系写入索引文件
     public boolean putKey(final String key, final long phyOffset, final long storeTimestamp) {
+        // 判断index条目是否已满，indexNum默认2000w
         if (this.indexHeader.getIndexCount() < this.indexNum) {
             int keyHash = indexKeyHashMethod(key);
             int slotPos = keyHash % this.hashSlotNum;
+            // 获取该消息的哈希槽在indexFile文件中的物理偏移量
             int absSlotPos = IndexHeader.INDEX_HEADER_SIZE + slotPos * hashSlotSize;
 
             FileLock fileLock = null;
@@ -101,6 +104,7 @@ public class IndexFile {
 
                 // fileLock = this.fileChannel.lock(absSlotPos, hashSlotSize,
                 // false);
+                // slotValue是index条目在indexFile文件中的逻辑偏移量(即下标)，此处是防止哈希冲突的关键
                 int slotValue = this.mappedByteBuffer.getInt(absSlotPos);
                 if (slotValue <= invalidIndex || slotValue > this.indexHeader.getIndexCount()) {
                     slotValue = invalidIndex;
@@ -118,11 +122,14 @@ public class IndexFile {
                     timeDiff = 0;
                 }
 
+                // 得到该消息在indexFile文件的index条目中的物理偏移量
                 int absIndexPos =
                     IndexHeader.INDEX_HEADER_SIZE + this.hashSlotNum * hashSlotSize
                         + this.indexHeader.getIndexCount() * indexSize;
 
+                // 向index条目中写入消息的索引信息
                 this.mappedByteBuffer.putInt(absIndexPos, keyHash);
+                // 该消息在commitlog文件中的物理偏移量
                 this.mappedByteBuffer.putLong(absIndexPos + 4, phyOffset);
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8, (int) timeDiff);
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8 + 4, slotValue);
@@ -186,6 +193,7 @@ public class IndexFile {
         return result;
     }
 
+    // 根据消息key，查找消息的物理偏移量，放在传入的参数phyOffsets中
     public void selectPhyOffset(final List<Long> phyOffsets, final String key, final int maxNum,
         final long begin, final long end, boolean lock) {
         if (this.mappedFile.hold()) {

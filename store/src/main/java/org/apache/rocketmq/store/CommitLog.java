@@ -551,6 +551,7 @@ public class CommitLog {
         return beginTimeInLock;
     }
 
+    // 将消息写入缓冲区
     public PutMessageResult putMessage(final MessageExtBrokerInner msg) {
         // Set the storage time
         msg.setStoreTimestamp(System.currentTimeMillis());
@@ -872,10 +873,13 @@ public class CommitLog {
         return -1;
     }
 
+    // 通过偏移量，从mappedFile中查询消息
     public SelectMappedBufferResult getMessage(final long offset, final int size) {
         int mappedFileSize = this.defaultMessageStore.getMessageStoreConfig().getMappedFileSizeCommitLog();
+        // 根据offset返回所在的mappedFile
         MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset, offset == 0);
         if (mappedFile != null) {
+            // 根据offset取余得到offset在此mappedFile的具体位置
             int pos = (int) (offset % mappedFileSize);
             return mappedFile.selectMappedBuffer(pos, size);
         }
@@ -970,12 +974,14 @@ public class CommitLog {
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitCommitLogThoroughInterval();
 
                 long begin = System.currentTimeMillis();
+                // 超过200ms，不管脏页是否达到commitDataLeastPages，都要提交一次，方法是把commitDataLeastPages设为0
                 if (begin >= (this.lastCommitTimestamp + commitDataThoroughInterval)) {
                     this.lastCommitTimestamp = begin;
                     commitDataLeastPages = 0;
                 }
 
                 try {
+                    // result=false，表明有数据被提交了
                     boolean result = CommitLog.this.mappedFileQueue.commit(commitDataLeastPages);
                     long end = System.currentTimeMillis();
                     if (!result) {
@@ -1029,6 +1035,7 @@ public class CommitLog {
                 }
 
                 try {
+                    // 等待被commitLogService服务的线程唤醒
                     if (flushCommitLogTimed) {
                         Thread.sleep(interval);
                     } else {
@@ -1236,7 +1243,7 @@ public class CommitLog {
             return msgStoreItemMemory;
         }
 
-        //commitlog中真正写入消息的方法
+        //commitlog中真正写入消息的方法，此处只是把消息写入writeBuffer中，并未刷盘
         public AppendMessageResult doAppend(final long fileFromOffset, final ByteBuffer byteBuffer, final int maxBlank,
             final MessageExtBrokerInner msgInner) {
             // STORETIMESTAMP + STOREHOSTADDRESS + OFFSET <br>
