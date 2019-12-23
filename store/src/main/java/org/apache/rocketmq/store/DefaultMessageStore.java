@@ -1226,6 +1226,7 @@ public class DefaultMessageStore implements MessageStore {
 
     private void addScheduleTask() {
 
+        // 定时删除过期文件
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {

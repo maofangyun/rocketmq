@@ -210,6 +210,7 @@ public class MappedFile extends ReferenceResource {
 
         //判断commitlog文件是否写满
         if (currentPos < this.fileSize) {
+            // 看是否开启堆外内存，决定使用哪个缓冲区
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
             byteBuffer.position(currentPos);
             AppendMessageResult result;
