@@ -177,6 +177,7 @@ public class DefaultMessageStore implements MessageStore {
         boolean result = true;
 
         try {
+            // 异常退出时，commitlog和consumeQueue、indexFile中的数据可能不一致，需要修复
             boolean lastExitOK = !this.isTempFileExist();
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
 
@@ -1287,6 +1288,7 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    // 查看Abort文件是否存在，若正常退出，则Abort文件会被删除，返回false
     private boolean isTempFileExist() {
         String fileName = StorePathConfigHelper.getAbortFile(this.messageStoreConfig.getStorePathRootDir());
         File file = new File(fileName);
@@ -1500,6 +1502,7 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    // 转发消息到indexFile(索引文件)的方法
     class CommitLogDispatcherBuildIndex implements CommitLogDispatcher {
 
         @Override

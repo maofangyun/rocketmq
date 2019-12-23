@@ -551,7 +551,7 @@ public class CommitLog {
         return beginTimeInLock;
     }
 
-    // 将消息写入缓冲区
+    // 将消息写入缓冲区，之后会有线程(commitlog的run方法)根据mappedFile中写指针和提交指针的差值，来决定是否将缓冲区的数据提交到fileChannel中
     public PutMessageResult putMessage(final MessageExtBrokerInner msg) {
         // Set the storage time
         msg.setStoreTimestamp(System.currentTimeMillis());
@@ -622,7 +622,7 @@ public class CommitLog {
                 return new PutMessageResult(PutMessageStatus.CREATE_MAPEDFILE_FAILED, null);
             }
 
-            //此处写入消息到commitlog中，最终回调appendMessageCallback的doAppend()
+            //此处写入消息到缓冲区中，最终回调appendMessageCallback的doAppend()
             result = mappedFile.appendMessage(msg, this.appendMessageCallback);
             switch (result.getStatus()) {
                 case PUT_OK:
@@ -638,6 +638,7 @@ public class CommitLog {
                         beginTimeInLock = 0;
                         return new PutMessageResult(PutMessageStatus.CREATE_MAPEDFILE_FAILED, result);
                     }
+                    // 再次调用appendMessage(),写入消息到缓冲区中
                     result = mappedFile.appendMessage(msg, this.appendMessageCallback);
                     break;
                 case MESSAGE_SIZE_EXCEEDED:
@@ -672,6 +673,7 @@ public class CommitLog {
         storeStatsService.getSinglePutMessageTopicTimesTotal(msg.getTopic()).incrementAndGet();
         storeStatsService.getSinglePutMessageTopicSizeTotal(topic).addAndGet(result.getWroteBytes());
 
+        //刷盘
         handleDiskFlush(result, putMessageResult, msg);
         handleHA(result, putMessageResult, msg);
 
@@ -965,6 +967,7 @@ public class CommitLog {
         @Override
         public void run() {
             CommitLog.log.info(this.getServiceName() + " service started");
+            // 将缓冲区的数据提交到fileChannel，并唤醒flush线程进行刷盘
             while (!this.isStopped()) {
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitIntervalCommitLog();
 
@@ -1388,6 +1391,7 @@ public class CommitLog {
 
             final long beginTimeMills = CommitLog.this.defaultMessageStore.now();
             // Write messages to the queue buffer
+            // 消息写入缓冲区
             byteBuffer.put(this.msgStoreItemMemory.array(), 0, msgLen);
 
             AppendMessageResult result = new AppendMessageResult(AppendMessageStatus.PUT_OK, wroteOffset, msgLen, msgId,

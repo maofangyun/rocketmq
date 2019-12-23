@@ -148,6 +148,7 @@ public class MappedFileQueue {
     }
 
     public boolean load() {
+        // storePath是commitlog文件的存储路径
         File dir = new File(this.storePath);
         File[] files = dir.listFiles();
         if (files != null) {
@@ -163,10 +164,11 @@ public class MappedFileQueue {
 
                 try {
                     MappedFile mappedFile = new MappedFile(file.getPath(), mappedFileSize);
-
+                    // 指针全部设置为mappedFileSize
                     mappedFile.setWrotePosition(this.mappedFileSize);
                     mappedFile.setFlushedPosition(this.mappedFileSize);
                     mappedFile.setCommittedPosition(this.mappedFileSize);
+                    // 所有mappedFile放入list集合，完成加载
                     this.mappedFiles.add(mappedFile);
                     log.info("load " + file.getPath() + " OK");
                 } catch (IOException e) {
