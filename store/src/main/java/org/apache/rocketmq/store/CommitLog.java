@@ -702,6 +702,7 @@ public class CommitLog {
             if (!this.defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
                 flushCommitLogService.wakeup();
             } else {
+                // 此处唤醒commitLogService，将缓冲区的数据提交到fileChannel中
                 commitLogService.wakeup();
             }
         }
