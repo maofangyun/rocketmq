@@ -551,7 +551,8 @@ public class CommitLog {
         return beginTimeInLock;
     }
 
-    // 将消息写入缓冲区，之后会有线程(commitlog的run方法)根据mappedFile中写指针和提交指针的差值，来决定是否将缓冲区的数据提交到fileChannel中
+    // 将消息写入缓冲区，之后会有线程(commitlog的run方法)根据mappedFile中写指针和提交指针的差值，
+    // 来决定是否将缓冲区的数据提交到fileChannel中
     public PutMessageResult putMessage(final MessageExtBrokerInner msg) {
         // Set the storage time
         msg.setStoreTimestamp(System.currentTimeMillis());
@@ -703,7 +704,7 @@ public class CommitLog {
             if (!this.defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
                 flushCommitLogService.wakeup();
             } else {
-                // 此处唤醒commitLogService，将缓冲区的数据提交到fileChannel中
+                // 此处唤醒commitLogService，将缓冲区的数据提交到fileChannel中，将hasNotified置为true
                 commitLogService.wakeup();
             }
         }
@@ -998,6 +999,8 @@ public class CommitLog {
                     if (end - begin > 500) {
                         log.info("Commit data to file costs {} ms", end - begin);
                     }
+                    // handleDiskFlush()刷盘时，commitLogService会调用wakeup()将hasNotified置为true，
+                    // 消息提交完毕之后，调用此方法，重新将hasNotified置为false
                     this.waitForRunning(interval);
                 } catch (Throwable e) {
                     CommitLog.log.error(this.getServiceName() + " service has exception. ", e);
@@ -1183,6 +1186,7 @@ public class CommitLog {
 
             while (!this.isStopped()) {
                 try {
+                    // 每次执行doCommit()之后，睡眠10ms
                     this.waitForRunning(10);
                     this.doCommit();
                 } catch (Exception e) {
