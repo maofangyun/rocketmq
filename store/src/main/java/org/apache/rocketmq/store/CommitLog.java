@@ -99,6 +99,7 @@ public class CommitLog {
     public void start() {
         this.flushCommitLogService.start();
 
+        // 开启了堆外内存，才会启动commitLogService
         if (defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
             this.commitLogService.start();
         }
@@ -687,8 +688,12 @@ public class CommitLog {
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
             if (messageExt.isWaitStoreMsgOK()) {
+                // nextOffset = result.getWroteOffset() + result.getWroteBytes(),
+                // nextOffset表示此条消息写完之后，下条消息的初始写入偏移量(累加量)
                 GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes());
                 service.putRequest(request);
+                // 调用waitForFlush()会阻塞5s，由于前面一步调用putRequest(),GroupCommitServic线程会立即执行doCommit()操作，
+                // 将缓冲区的数据刷盘，刷盘完成之后调用wakeupCustomer()，执行countDownLatch.countDown()，waitForFlush将立即返回
                 boolean flushOK = request.waitForFlush(this.defaultMessageStore.getMessageStoreConfig().getSyncFlushTimeout());
                 if (!flushOK) {
                     log.error("do groupcommit, wait for flush failed, topic: " + messageExt.getTopic() + " tags: " + messageExt.getTags()
@@ -1000,6 +1005,8 @@ public class CommitLog {
                         log.info("Commit data to file costs {} ms", end - begin);
                     }
                     // handleDiskFlush()刷盘时，commitLogService会调用wakeup()将hasNotified置为true，
+                    // 由于将hasNotified默认为false，故handleDiskFlush()未调用时，将执行waitPoint.await(),等待200ms，
+                    // 当wakeup()调用时，会执行waitPoint.countDown()，故waitForRunning(200)会立即返回，这就是wakeup()作用，
                     // 消息提交完毕之后，调用此方法，重新将hasNotified置为false
                     this.waitForRunning(interval);
                 } catch (Throwable e) {
@@ -1186,7 +1193,12 @@ public class CommitLog {
 
             while (!this.isStopped()) {
                 try {
-                    // 每次执行doCommit()之后，睡眠10ms
+                    // 每次执行doCommit()之后，等待10ms，
+                    // 由于每次执行putRequest()，会执行waitPoint.countDown()，
+                    // 所以waitForRunning(10)中的waitPoint.await()将立即返回，
+                    // 故执行完putRequest()之后，将立即执行doCommit()
+                    // waitForRunning()还会调用onWaitEnd()方法，交换requestsWrite和requestsRead，
+                    // 每执行一次doCommit()，都会交换一次
                     this.waitForRunning(10);
                     this.doCommit();
                 } catch (Exception e) {
@@ -1258,7 +1270,7 @@ public class CommitLog {
             // STORETIMESTAMP + STOREHOSTADDRESS + OFFSET <br>
 
             // PHY OFFSET
-            //写入的初始偏移量
+            //写入的初始偏移量(累加量)
             long wroteOffset = fileFromOffset + byteBuffer.position();
 
             int sysflag = msgInner.getSysFlag();

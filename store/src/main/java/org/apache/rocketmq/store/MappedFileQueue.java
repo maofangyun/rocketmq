@@ -438,7 +438,9 @@ public class MappedFileQueue {
         MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0);
         if (mappedFile != null) {
             long tmpTimeStamp = mappedFile.getStoreTimestamp();
+            // 返回的offset代表mappedFile刷盘的指针位置
             int offset = mappedFile.flush(flushLeastPages);
+            // where代表刷盘的偏移量(累加量)
             long where = mappedFile.getFileFromOffset() + offset;
             result = where == this.flushedWhere;
             this.flushedWhere = where;

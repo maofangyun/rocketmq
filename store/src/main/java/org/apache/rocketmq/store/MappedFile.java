@@ -491,6 +491,7 @@ public class MappedFile extends ReferenceResource {
      * @return The max position which have valid data
      */
     public int getReadPosition() {
+        // wrotePosition的更新在appendMessagesInner()方法中
         return this.writeBuffer == null ? this.wrotePosition.get() : this.committedPosition.get();
     }
 
