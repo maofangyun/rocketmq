@@ -1150,6 +1150,10 @@ public class CommitLog {
             }
         }
 
+        // ---精髓---
+        // 交换读写容器的原因：在doCommit()时，会将requestsRead当作同步块的Object，
+        // 所以当执行doCommit时，requestsRead在其他地方将不可用，故需要将requestsRead和requestsWrite交换
+        // 防止请求的消费和请求的添加之间的锁冲突
         private void swapRequests() {
             List<GroupCommitRequest> tmp = this.requestsWrite;
             this.requestsWrite = this.requestsRead;
