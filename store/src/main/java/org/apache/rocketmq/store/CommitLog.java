@@ -72,8 +72,10 @@ public class CommitLog {
         this.defaultMessageStore = defaultMessageStore;
 
         if (FlushDiskType.SYNC_FLUSH == defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
+            // 当同步刷盘时
             this.flushCommitLogService = new GroupCommitService();
         } else {
+            // 当异步刷盘时
             this.flushCommitLogService = new FlushRealTimeService();
         }
 
@@ -682,9 +684,10 @@ public class CommitLog {
         return putMessageResult;
     }
 
+    // 同步刷盘时，不会走fileChannel
     public void handleDiskFlush(AppendMessageResult result, PutMessageResult putMessageResult, MessageExt messageExt) {
         // Synchronization flush
-        // 同步刷盘，不用走堆外内存，直接由mappedFileBuffer区向fileChannel写入数据
+        // 同步刷盘，不用走堆外内存，直接由mappedFileBuffer区向commitlog写入数据
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
             if (messageExt.isWaitStoreMsgOK()) {
@@ -707,6 +710,7 @@ public class CommitLog {
         // Asynchronous flush
         else {
             if (!this.defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
+                // 没有开启堆外内存的情况下，也是直接将数据从缓冲区写入commitlog，不经过fileChannel
                 flushCommitLogService.wakeup();
             } else {
                 // 此处唤醒commitLogService，将缓冲区的数据提交到fileChannel中，将hasNotified置为true

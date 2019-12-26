@@ -307,6 +307,7 @@ public class MappedFile extends ReferenceResource {
 
     // 提交数据，并返回提交指针
     // commit()方法的作用就是将MappedFile的writeBuffer中的数据提交到文件通道fileChannel
+    // 写入fileChannel其实就是写入mappedByteBuffer
     public int commit(final int commitLeastPages) {
         //首先判断是否开启了堆外内存
         if (writeBuffer == null) {
@@ -343,7 +344,7 @@ public class MappedFile extends ReferenceResource {
                 byteBuffer.limit(writePos);
                 this.fileChannel.position(lastCommittedPosition);
                 this.fileChannel.write(byteBuffer);
-                //写入fileChannel之后完成committedPosition的更新
+                //写入fileChannel之后完成committedPosition的更新，写入fileChannel其实就是写入mappedByteBuffer
                 this.committedPosition.set(writePos);
             } catch (Throwable e) {
                 log.error("Error occurred when commit data to FileChannel.", e);
