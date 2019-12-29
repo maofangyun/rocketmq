@@ -152,7 +152,9 @@ public class DefaultMessageStore implements MessageStore {
         this.indexService.start();
 
         this.dispatcherList = new LinkedList<>();
+        // 添加ConsumeQueue的转发器
         this.dispatcherList.addLast(new CommitLogDispatcherBuildConsumeQueue());
+        // 添加IndexFile的转发器
         this.dispatcherList.addLast(new CommitLogDispatcherBuildIndex());
 
         File file = new File(StorePathConfigHelper.getLockFile(messageStoreConfig.getStorePathRootDir()));
@@ -1836,21 +1838,23 @@ public class DefaultMessageStore implements MessageStore {
                     break;
                 }
 
+                // 从MappedFile中通过reputFromOffset获取偏移量之后的所有数据
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
-                        // 和前面的没变，还是在commitlog中的物理偏移量
+                        // 和前面的没变，还是代表commitlog中的物理偏移量
                         this.reputFromOffset = result.getStartOffset();
 
                         // result.getSize()表示消息一共有多少字节
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
+                            // 创建分发的请求
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
-                                    // 此处进行转发
+                                    // 此处进行转发，到ConsumeQueue和IndexFile中
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()

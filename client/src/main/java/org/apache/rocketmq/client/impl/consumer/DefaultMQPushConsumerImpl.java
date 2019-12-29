@@ -580,6 +580,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     this.defaultMQPushConsumer.changeInstanceNameToPID();
                 }
 
+                // 在同一个JVM进程中，消息的生产者和消息的消费者共用一个MQClientInstance
                 this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQPushConsumer, this.rpcHook);
 
                 this.rebalanceImpl.setConsumerGroup(this.defaultMQPushConsumer.getConsumerGroup());

@@ -67,6 +67,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     /**
      * Internal implementation. Most of the functions herein are delegated to it.
      */
+    // 委托设计模式
     protected final transient DefaultMQPushConsumerImpl defaultMQPushConsumerImpl;
 
     /**
@@ -151,6 +152,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     /**
      * Offset Storage
      */
+    // 存放到硬盘的某个json文件中
     private OffsetStore offsetStore;
 
     /**

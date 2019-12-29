@@ -48,8 +48,9 @@ public class MappedFile extends ReferenceResource {
     private static final AtomicLong TOTAL_MAPPED_VIRTUAL_MEMORY = new AtomicLong(0);
 
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
+    // 缓冲区的写入指针
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
-    //当前文件的提交指针 commitedPosition <= flushedPosition <= fileSize
+    //当前文件的提交指针
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
     //已经提交(已经持久化到磁盘)的位置
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
@@ -222,6 +223,7 @@ public class MappedFile extends ReferenceResource {
             } else {
                 return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
             }
+            // 更新wrotePosition，对于开启了堆外内存，还会在CommitRealTimeService线程中更新committedPosition
             this.wrotePosition.addAndGet(result.getWroteBytes());
             this.storeTimestamp = result.getStoreTimestamp();
             return result;
@@ -314,6 +316,7 @@ public class MappedFile extends ReferenceResource {
         //首先判断是否开启了堆外内存
         if (writeBuffer == null) {
             //no need to commit data to file channel, so just regard wrotePosition as committedPosition.
+            // 未开启堆外内存，直接返回wrotePosition
             return this.wrotePosition.get();
         }
         if (this.isAbleToCommit(commitLeastPages)) {
@@ -495,6 +498,7 @@ public class MappedFile extends ReferenceResource {
      */
     public int getReadPosition() {
         // wrotePosition的更新在appendMessagesInner()方法中
+        // TODO 为什么要以wrotePosition和committedPosition作为消息已存入的偏移量
         return this.writeBuffer == null ? this.wrotePosition.get() : this.committedPosition.get();
     }
 

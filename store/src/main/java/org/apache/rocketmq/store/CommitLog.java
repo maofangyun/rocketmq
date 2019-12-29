@@ -1149,6 +1149,7 @@ public class CommitLog {
             synchronized (this.requestsWrite) {
                 this.requestsWrite.add(request);
             }
+            // 此处设计也很精妙，当doCommit()出现消费堆积时，此处不会执行，也就不会发生读写容器的交换
             if (hasNotified.compareAndSet(false, true)) {
                 waitPoint.countDown(); // notify
             }

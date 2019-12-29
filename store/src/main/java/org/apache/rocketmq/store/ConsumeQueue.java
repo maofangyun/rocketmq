@@ -25,6 +25,9 @@ import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.store.config.BrokerRole;
 import org.apache.rocketmq.store.config.StorePathConfigHelper;
 
+/**
+ * 一个消息队列同一时间只能被一个消费者消费，一个消费者同一时间可以消费多个消息队列
+ * */
 public class ConsumeQueue {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
