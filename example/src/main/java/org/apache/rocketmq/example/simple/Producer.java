@@ -27,6 +27,7 @@ public class Producer {
 
         // 相同的ProducerGroup不同的producer是否会在producerTable中只存储一个？会报错MQClientException
         DefaultMQProducer producer = new DefaultMQProducer("ProducerGroupName");
+        producer.setNamesrvAddr("127.0.0.1:9876");
         producer.start();
 
         for (int i = 0; i < 128; i++)
@@ -44,6 +45,6 @@ public class Producer {
                 e.printStackTrace();
             }
 
-        producer.shutdown();
+        //producer.shutdown();
     }
 }
