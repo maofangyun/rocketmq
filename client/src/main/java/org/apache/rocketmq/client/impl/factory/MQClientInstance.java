@@ -284,6 +284,7 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
+        // 向broker发送心跳数据，包括生产者和消费者的订阅关系
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -297,6 +298,7 @@ public class MQClientInstance {
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
 
+        // 定时持久化消息进度到文件
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override

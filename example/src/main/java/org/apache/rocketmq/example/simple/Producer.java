@@ -26,18 +26,24 @@ public class Producer {
     public static void main(String[] args) throws MQClientException, InterruptedException {
 
         // 相同的ProducerGroup不同的producer是否会在producerTable中只存储一个？会报错MQClientException
-        DefaultMQProducer producer = new DefaultMQProducer("ProducerGroupName");
-        producer.setNamesrvAddr("127.0.0.1:9876");
-        producer.start();
+        DefaultMQProducer producer1 = new DefaultMQProducer("ProducerGroupName1");
+        producer1.setNamesrvAddr("127.0.0.1:9876");
+        producer1.setInstanceName("test1");
+        producer1.start();
+
+        //DefaultMQProducer producer2 = new DefaultMQProducer("ProducerGroupName2");
+        //producer2.setNamesrvAddr("127.0.0.1:9876");
+        //producer2.setInstanceName("test2");
+        //producer2.start();
 
         for (int i = 0; i < 128; i++)
             try {
                 {
-                    Message msg = new Message("TopicTest",
+                    Message msg = new Message("TopicTest1",
                         "TagA",
                         "OrderID188",
                         "Hello world".getBytes(RemotingHelper.DEFAULT_CHARSET));
-                    SendResult sendResult = producer.send(msg);
+                    SendResult sendResult = producer1.send(msg);
                     System.out.printf("%s%n", sendResult);
                 }
 

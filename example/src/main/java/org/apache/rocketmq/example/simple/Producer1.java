@@ -27,15 +27,17 @@ public class Producer1 {
 
         // 相同的ProducerGroup不同的producer是否会在producerTable中只存储一个？会报错MQClientException
         DefaultMQProducer producer = new DefaultMQProducer("ProducerGroupName1");
+        producer.setNamesrvAddr("127.0.0.1:9876");
+        producer.setInstanceName("test1");
         producer.start();
 
         for (int i = 0; i < 128; i++)
             try {
                 {
-                    Message msg = new Message("TopicTest",
-                        "TagA",
-                        "OrderID188",
-                        "Hello world".getBytes(RemotingHelper.DEFAULT_CHARSET));
+                    Message msg = new Message("TopicTest2",
+                            "TagA",
+                            "OrderID188",
+                            "Hello world".getBytes(RemotingHelper.DEFAULT_CHARSET));
                     SendResult sendResult = producer.send(msg);
                     System.out.printf("%s%n", sendResult);
                 }
@@ -44,6 +46,6 @@ public class Producer1 {
                 e.printStackTrace();
             }
 
-        producer.shutdown();
+        //producer.shutdown();
     }
 }

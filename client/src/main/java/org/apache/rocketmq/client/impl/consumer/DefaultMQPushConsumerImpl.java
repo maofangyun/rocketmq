@@ -610,9 +610,19 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     }
                     this.defaultMQPushConsumer.setOffsetStore(this.offsetStore);
                 }
-                // 加载之前的消费进度
+                // 加载之前的消费进度，不管是广播模式还是集群模式，都会将消费进度存储在文件上
+                // 存储格式如下
+                // {
+                //    "offsetTable":{
+                //    "TopicTest@CID_JODIE_1":{0:32,1:32,2:32,3:32
+                //    },
+                //    "%RETRY%CID_JODIE_1@CID_JODIE_1":{0:0
+                //    }
+                //  }
+                //}
                 this.offsetStore.load();
 
+                // 根据是否是顺序消息，consumeMessageService消息消费服务，赋值不同的线程对象
                 if (this.getMessageListenerInner() instanceof MessageListenerOrderly) {
                     this.consumeOrderly = true;
                     this.consumeMessageService =
@@ -625,7 +635,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
                 this.consumeMessageService.start();
 
-                // 在同一个JVM进程中，只能有一个ConsumerGroup的消费者
+                // 向MQClientInstance注册消费者，在同一个JVM进程中，只能有一个ConsumerGroup的消费者
                 boolean registerOK = mQClientFactory.registerConsumer(this.defaultMQPushConsumer.getConsumerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
