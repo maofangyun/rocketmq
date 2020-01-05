@@ -165,6 +165,7 @@ public class ProcessQueue {
         return dispatchToConsume;
     }
 
+    // ProcessQueue中消息偏移量最大值与最小值的差(msgTreeMap中的消息偏移量，不见得是连续的)
     public long getMaxSpan() {
         try {
             this.lockTreeMap.readLock().lockInterruptibly();
