@@ -99,7 +99,12 @@ public class BrokerStartup {
         }
 
         try {
-            //PackageConflictDetect.detectFastjson();
+            // Options提供了不同的解析模式，来解析broker启动时，传入的命令参数
+            // -c 配置文件的路径
+            // -h 打印帮助信息
+            // -n NameServer的地址
+            // -p 打印所有配置项
+            // -m 打印重要的配置项
             Options options = ServerUtil.buildCommandlineOptions(new Options());
             commandLine = ServerUtil.parseCmdLine("mqbroker", args, buildCommandlineOptions(options),
                 new PosixParser());
@@ -107,13 +112,18 @@ public class BrokerStartup {
                 System.exit(-1);
             }
 
+            // Broker的配置类
             final BrokerConfig brokerConfig = new BrokerConfig();
+            // Netty服务端的配置类
             final NettyServerConfig nettyServerConfig = new NettyServerConfig();
+            // Netty客户端的配置类
             final NettyClientConfig nettyClientConfig = new NettyClientConfig();
-
+            // Netty客户端设置使用安全传输层协议(TLS)
             nettyClientConfig.setUseTLS(Boolean.parseBoolean(System.getProperty(TLS_ENABLE,
                 String.valueOf(TlsSystemConfig.tlsMode == TlsMode.ENFORCING))));
+            // Netty服务端的监听端口
             nettyServerConfig.setListenPort(10911);
+            // 消息存储的配置类
             final MessageStoreConfig messageStoreConfig = new MessageStoreConfig();
 
             if (BrokerRole.SLAVE == messageStoreConfig.getBrokerRole()) {
@@ -121,6 +131,7 @@ public class BrokerStartup {
                 messageStoreConfig.setAccessMessageInMemoryMaxRatio(ratio);
             }
 
+            // 读取外置的配置文件，填充配置类的配置信息
             if (commandLine.hasOption('c')) {
                 String file = commandLine.getOptionValue('c');
                 if (file != null) {
@@ -152,6 +163,7 @@ public class BrokerStartup {
                 try {
                     String[] addrArray = namesrvAddr.split(";");
                     for (String addr : addrArray) {
+                        // 校验namesrvAddr的地址是否合法
                         RemotingUtil.string2SocketAddress(addr);
                     }
                 } catch (Exception e) {

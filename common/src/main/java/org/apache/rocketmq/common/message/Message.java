@@ -50,6 +50,7 @@ public class Message implements Serializable {
         if (keys != null && keys.length() > 0)
             this.setKeys(keys);
 
+        // 消息发送后，是否等消息存储完成之后再返回(默认为true)
         this.setWaitStoreMsgOK(waitStoreMsgOK);
     }
 
@@ -146,6 +147,7 @@ public class Message implements Serializable {
         return 0;
     }
 
+    // 消息的延迟级别，用于定时消息和消息重试
     public void setDelayTimeLevel(int level) {
         this.putProperty(MessageConst.PROPERTY_DELAY_TIME_LEVEL, String.valueOf(level));
     }

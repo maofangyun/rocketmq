@@ -183,15 +183,18 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             case CREATE_JUST:
                 this.serviceState = ServiceState.START_FAILED;
 
+                // 验证producerGroup的名称是否符合规则
                 this.checkConfig();
 
                 //若InstanceName=DEFAULT,用PID代替
-                //最好自己设置InstanceName，否则会出现出现不能正确的把消息发送到目标“集群”的问题
+                //最好自己设置InstanceName，否则会出现不能正确的把消息发送到目标“集群”的问题(多个连接不同NameServer的生产者)
                 if (!this.defaultMQProducer.getProducerGroup().equals(MixAll.CLIENT_INNER_PRODUCER_GROUP)) {
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
 
-                //获取MQClientInstance，作为生产者与NameServer,Broker沟通的通道，一个客户端(同一个进程)只能产生一个MQClientInstance实例对象
+                //获取MQClientInstance，作为生产者与NameServer,Broker沟通的通道，一个客户端(同一个进程)只能产生一个MQClientManager实例对象
+                // MQClientManager是管理MQClientInstance的缓存表，同一个clientId只能创建一个MQClientInstance
+                // clientId = ip+@+instanceName
                 this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQProducer, rpcHook);
 
                 //将ProducerGroup注册到productTable中，同一个MQClientInstance中ProducerGroup不能重复

@@ -111,8 +111,9 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                // 加写锁，同一时间，保证写操作单线程运行
                 this.lock.writeLock().lockInterruptibly();
-
+                // 更新集群信息
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
                 if (null == brokerNames) {
                     brokerNames = new HashSet<String>();
@@ -122,6 +123,7 @@ public class RouteInfoManager {
 
                 boolean registerFirst = false;
 
+                // 更新broker的信息
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                 if (null == brokerData) {
                     registerFirst = true;
@@ -140,8 +142,9 @@ public class RouteInfoManager {
                 }
 
                 String oldAddr = brokerData.getBrokerAddrs().put(brokerId, brokerAddr);
+                // 设置broker是否首次注册
                 registerFirst = registerFirst || (null == oldAddr);
-
+                // 更新topicQueueTable表
                 if (null != topicConfigWrapper
                     && MixAll.MASTER_ID == brokerId) {
                     if (this.isBrokerTopicConfigChanged(brokerAddr, topicConfigWrapper.getDataVersion())
@@ -156,6 +159,7 @@ public class RouteInfoManager {
                     }
                 }
 
+                // 更新broker存活信息
                 BrokerLiveInfo prevBrokerLiveInfo = this.brokerLiveTable.put(brokerAddr,
                     new BrokerLiveInfo(
                         System.currentTimeMillis(),
@@ -371,6 +375,7 @@ public class RouteInfoManager {
         }
     }
 
+    // 生产者按主题拉取路由信息
     public TopicRouteData pickupTopicRouteData(final String topic) {
         TopicRouteData topicRouteData = new TopicRouteData();
         boolean foundQueueData = false;

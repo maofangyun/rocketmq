@@ -77,6 +77,7 @@ public class NamesrvController {
         //从NamesrvController的配置中找到KvConfigPath，并按照路径加载
         this.kvConfigManager.load();
 
+        // 创建Netty的连接
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
 
         //初始化netty的工作线程池

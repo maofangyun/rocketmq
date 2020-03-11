@@ -184,13 +184,15 @@ public class DefaultMessageStore implements MessageStore {
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
 
             if (null != scheduleMessageService) {
+                // 加载D:\rocketmq\store\config\delayOffset.json中延迟消息偏移量信息到ScheduleMessageService中的offsetTable
+                // delayOffset.json存储对于延迟主题SCHEDULE_TOPIC_XXXX的每个consumequeue队列的消费进度
                 result = result && this.scheduleMessageService.load();
             }
 
-            // load Commit Log
+            // 加载磁盘上的commitLog到内存
             result = result && this.commitLog.load();
 
-            // load Consume Queue
+            // 加载磁盘上的ConsumeQueue到内存
             result = result && this.loadConsumeQueue();
 
             if (result) {

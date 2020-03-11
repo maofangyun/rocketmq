@@ -47,6 +47,7 @@ public class MQClientManager {
         return getOrCreateMQClientInstance(clientConfig, null);
     }
 
+    // 同一个clientId只能创建一个MQClientInstance
     public MQClientInstance getOrCreateMQClientInstance(final ClientConfig clientConfig, RPCHook rpcHook) {
         // 得到线程ID
         // clientId = ip+@+instanceName

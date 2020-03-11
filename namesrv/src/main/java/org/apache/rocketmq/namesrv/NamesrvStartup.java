@@ -81,8 +81,9 @@ public class NamesrvStartup {
             System.exit(-1);
             return null;
         }
-
+        // Namesrv的配置类
         final NamesrvConfig namesrvConfig = new NamesrvConfig();
+        // Netty服务端的配置类
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
         nettyServerConfig.setListenPort(9876);
         if (commandLine.hasOption('c')) {
@@ -157,7 +158,7 @@ public class NamesrvStartup {
             }
         }));
 
-        //启动初始化NamesrvController
+        //启动NamesrvController，主要是启动remotingServer
         controller.start();
 
         return controller;
