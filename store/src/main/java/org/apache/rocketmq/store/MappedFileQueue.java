@@ -44,7 +44,7 @@ public class MappedFileQueue {
 
     private final AllocateMappedFileService allocateMappedFileService;
 
-    //表示某一个commitlog中数据写入的位置(是个累加量) committedWhere <= flushedWhere
+    //表示某一个commitlog中数据写入的位置(是个累加量) committedWhere >= flushedWhere
     private long flushedWhere = 0;
     //由于永远只会有一个commitlog被使用，也就是说只有一个MappedFile被启用，则此属性表示mappedFile写入的数据位置(是个累加量)
     private long committedWhere = 0;
@@ -442,6 +442,7 @@ public class MappedFileQueue {
             int offset = mappedFile.flush(flushLeastPages);
             // where代表刷盘的偏移量(累加量)
             long where = mappedFile.getFileFromOffset() + offset;
+            // result=false表示有数据存入磁盘
             result = where == this.flushedWhere;
             this.flushedWhere = where;
             if (0 == flushLeastPages) {
@@ -462,7 +463,9 @@ public class MappedFileQueue {
             int offset = mappedFile.commit(commitLeastPages);
             // 此处才是mappedfile中所有消息的累加偏移量
             long where = mappedFile.getFileFromOffset() + offset;
+            // 当有数据提交到mappedByteBuffer之后,返回false
             result = where == this.committedWhere;
+            // 更新累计的提交量
             this.committedWhere = where;
         }
 

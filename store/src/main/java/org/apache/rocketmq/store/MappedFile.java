@@ -50,9 +50,9 @@ public class MappedFile extends ReferenceResource {
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
     // 缓冲区的写入指针
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
-    //当前文件的提交指针
+    //当前文件的提交指针(将writeBuffer中的数据提交到mappedByteBuffer)
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
-    //已经提交(已经持久化到磁盘)的位置
+    //已经刷盘(已经持久化到磁盘)的位置
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
     //1024*1024*1024
     protected int fileSize;
@@ -212,7 +212,11 @@ public class MappedFile extends ReferenceResource {
         //判断commitlog文件是否写满
         if (currentPos < this.fileSize) {
             // 看是否开启堆外内存，决定使用哪个缓冲区
+            // slice()表示从原有缓冲区中分一片子缓冲区,容量为原缓冲区大小-已使用空间
+            // 子缓冲区的初始写位置=原缓冲区的写位置
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
+            // 由于RocketMQ的原缓冲区不进行写操作,所有写操作在子缓冲区进行,故原缓冲区写位置为零
+            // 需要在此处为子缓冲区设置新的写位置
             byteBuffer.position(currentPos);
             AppendMessageResult result;
             if (messageExt instanceof MessageExtBrokerInner) {
@@ -298,8 +302,9 @@ public class MappedFile extends ReferenceResource {
                 } catch (Throwable e) {
                     log.error("Error occurred when force data to disk.", e);
                 }
-
+                // 更新刷盘指针
                 this.flushedPosition.set(value);
+                // 此处释放锁,同时也会重置mappedByteBuffer缓冲区
                 this.release();
             } else {
                 log.warn("in flush, hold failed, flush offset = " + this.flushedPosition.get());
@@ -323,6 +328,7 @@ public class MappedFile extends ReferenceResource {
             //此处有同步，this.hold()获取锁，this.release()释放锁
             if (this.hold()) {
                 commit0(commitLeastPages);
+                // 此处释放锁,同时也会重置mappedByteBuffer缓冲区
                 this.release();
             } else {
                 log.warn("in commit, hold failed, commit offset = " + this.committedPosition.get());
@@ -348,6 +354,7 @@ public class MappedFile extends ReferenceResource {
                 byteBuffer.position(lastCommittedPosition);
                 byteBuffer.limit(writePos);
                 this.fileChannel.position(lastCommittedPosition);
+                // 将缓冲区中的数据写入到通道中
                 this.fileChannel.write(byteBuffer);
                 //写入fileChannel之后完成committedPosition的更新，写入fileChannel其实就是写入mappedByteBuffer
                 this.committedPosition.set(writePos);
@@ -498,7 +505,8 @@ public class MappedFile extends ReferenceResource {
      */
     public int getReadPosition() {
         // wrotePosition的更新在appendMessagesInner()方法中
-        // TODO 为什么要以wrotePosition和committedPosition作为消息已存入的偏移量
+        // 当开启堆外内存,把committedPosition当成当前写入的位置
+        // 未开启堆外内存,把wrotePosition当成当前写入的位置
         return this.writeBuffer == null ? this.wrotePosition.get() : this.committedPosition.get();
     }
 

@@ -59,7 +59,7 @@ public class CommitLog {
 
     private final AppendMessageCallback appendMessageCallback;
     private final ThreadLocal<MessageExtBatchEncoder> batchEncoderThreadLocal;
-    //存储了每个ConsumeQueue的偏移量(此偏移量指的是消息的数量num，真正的偏移量=num*20)
+    //存储在此ConsumeQueue上不同主题写入的消息数量
     protected HashMap<String/* topic-queueid */, Long/* offset */> topicQueueTable = new HashMap<String, Long>(1024);
     protected volatile long confirmOffset = -1L;
 
@@ -246,6 +246,7 @@ public class CommitLog {
         final boolean readBody) {
         try {
             // 1 TOTAL SIZE
+            // 读取此缓冲区当前位置的下四个字节，并根据当前字节顺序将它们组成一个int值，然后将该位置加4
             int totalSize = byteBuffer.getInt();
 
             // 2 MAGIC CODE
@@ -555,7 +556,7 @@ public class CommitLog {
     }
 
     // 将消息写入缓冲区，之后会有线程(commitlog的run方法)根据mappedFile中写指针和提交指针的差值，
-    // 来决定是否将缓冲区的数据提交到fileChannel中
+    // 看是否开启堆外内存,来决定是否将缓冲区的数据提交到fileChannel中
     public PutMessageResult putMessage(final MessageExtBrokerInner msg) {
         // Set the storage time
         msg.setStoreTimestamp(System.currentTimeMillis());
@@ -571,9 +572,10 @@ public class CommitLog {
         int queueId = msg.getQueueId();
 
         final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
-        if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
-            || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
+        if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE     // 非事务消息
+            || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {       //事务消息commit
             // Delay Delivery
+            // 延迟消息在此处更换主题
             if (msg.getDelayTimeLevel() > 0) {
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
                     msg.setDelayTimeLevel(this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());
@@ -616,8 +618,9 @@ public class CommitLog {
             // global
             msg.setStoreTimestamp(beginLockTimestamp);
 
-            if (null == mappedFile || mappedFile.isFull()) {    //判定是否新建commitlog
-                //返回最新的mappedFile，若commitlog不存在或者最新的已满，则新建一个返回
+            //判定是否新建mappedFile
+            //返回最新的mappedFile，若mappedFile不存在或者最新的已满，则新建一个返回
+            if (null == mappedFile || mappedFile.isFull()) {
                 mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise
             }
             if (null == mappedFile) {
@@ -673,30 +676,33 @@ public class CommitLog {
 
         PutMessageResult putMessageResult = new PutMessageResult(PutMessageStatus.PUT_OK, result);
 
-        // Statistics
+        // Statistics(做统计)
         storeStatsService.getSinglePutMessageTopicTimesTotal(msg.getTopic()).incrementAndGet();
         storeStatsService.getSinglePutMessageTopicSizeTotal(topic).addAndGet(result.getWroteBytes());
 
-        //刷盘
+        //刷盘(只有异步刷盘才会检测是否开启了堆外内存)
         handleDiskFlush(result, putMessageResult, msg);
         handleHA(result, putMessageResult, msg);
 
         return putMessageResult;
     }
 
-    // 同步刷盘时，不会走fileChannel
+
     public void handleDiskFlush(AppendMessageResult result, PutMessageResult putMessageResult, MessageExt messageExt) {
-        // Synchronization flush
         // 同步刷盘，不用走堆外内存，直接由mappedFileBuffer区向commitlog写入数据
+        // 同步刷盘其实就是调用了mappedByteBuffer.force()方法
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
+            // 在同步刷盘情况下是否需要等待数据落地才认为消息发送成功
             if (messageExt.isWaitStoreMsgOK()) {
+                // result.getWroteOffset() = fileFromOffset + byteBuffer.position();
                 // nextOffset = result.getWroteOffset() + result.getWroteBytes(),
                 // nextOffset表示此条消息写完之后，下条消息的初始写入偏移量(累加量)
                 GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes());
                 service.putRequest(request);
                 // 调用waitForFlush()会阻塞5s，由于前面一步调用putRequest(),GroupCommitServic线程会立即执行doCommit()操作，
                 // 将缓冲区的数据刷盘，刷盘完成之后调用wakeupCustomer()，执行countDownLatch.countDown()，waitForFlush将立即返回
+                // 使用了CountDownLatch机制，等待刷盘成功
                 boolean flushOK = request.waitForFlush(this.defaultMessageStore.getMessageStoreConfig().getSyncFlushTimeout());
                 if (!flushOK) {
                     log.error("do groupcommit, wait for flush failed, topic: " + messageExt.getTopic() + " tags: " + messageExt.getTags()
@@ -707,13 +713,15 @@ public class CommitLog {
                 service.wakeup();
             }
         }
-        // Asynchronous flush
+        // 异步刷盘
+        // 开启堆外内存池的好处:写消息时先写到堆外内存，纯内存操作非常快。读消息时是从pagecache中读，相当于实现了读写分离
         else {
             if (!this.defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
                 // 没有开启堆外内存的情况下，也是直接将数据从缓冲区写入commitlog，不经过fileChannel
                 flushCommitLogService.wakeup();
             } else {
-                // 此处唤醒commitLogService，将缓冲区的数据提交到fileChannel中，将hasNotified置为true
+                // 此处唤醒commitLogService，将缓冲区的数据提交到mappedByteBuffer中，将hasNotified置为true
+                // 同时commitLogService线程中会唤醒flushCommitLogService的刷盘线程,将数据写入磁盘
                 commitLogService.wakeup();
             }
         }
@@ -967,6 +975,7 @@ public class CommitLog {
         protected static final int RETRY_TIMES_OVER = 10;
     }
 
+    // 开启堆外内存,先将数据从writeBuffer提交到mappedByteBuffer中,然后再异步刷盘到磁盘
     class CommitRealTimeService extends FlushCommitLogService {
 
         private long lastCommitTimestamp = 0;
@@ -979,12 +988,15 @@ public class CommitLog {
         @Override
         public void run() {
             CommitLog.log.info(this.getServiceName() + " service started");
-            // 将缓冲区的数据提交到fileChannel，并唤醒flush线程进行刷盘
+            // 将writeBuffer数据提交到mappedByteBuffer，并唤醒flush线程进行刷盘
             while (!this.isStopped()) {
+                // 默认是200ms
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitIntervalCommitLog();
 
+                // 默认commitDataLeastPages=4
                 int commitDataLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitCommitLogLeastPages();
 
+                // 默认commitDataThoroughInterval =200
                 int commitDataThoroughInterval =
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitCommitLogThoroughInterval();
 
@@ -996,9 +1008,10 @@ public class CommitLog {
                 }
 
                 try {
-                    // result=false，表明有数据被提交了
+                    // result=false，表明有数据被提交到mappedByteBuffer
                     boolean result = CommitLog.this.mappedFileQueue.commit(commitDataLeastPages);
                     long end = System.currentTimeMillis();
+                    // 一旦有数据提交到mappedByteBuffer,立即调用刷盘线程将数据写入磁盘
                     if (!result) {
                         this.lastCommitTimestamp = end; // result = false means some data committed.
                         //now wake up flush thread.
@@ -1010,7 +1023,8 @@ public class CommitLog {
                     }
                     // handleDiskFlush()刷盘时，commitLogService会调用wakeup()将hasNotified置为true，
                     // 由于将hasNotified默认为false，故handleDiskFlush()未调用时，将执行waitPoint.await(),等待200ms，
-                    // 当wakeup()调用时，会执行waitPoint.countDown()，故waitForRunning(200)会立即返回，这就是wakeup()作用，
+                    // 当wakeup()调用时，会执行waitPoint.countDown()，故waitForRunning(200)会立即返回，
+                    // 返回之前,会将hasNotified置为false,这就是wakeup()作用，
                     // 消息提交完毕之后，调用此方法，重新将hasNotified置为false
                     this.waitForRunning(interval);
                 } catch (Throwable e) {
@@ -1027,6 +1041,7 @@ public class CommitLog {
         }
     }
 
+    // 异步刷盘的线程
     class FlushRealTimeService extends FlushCommitLogService {
         private long lastFlushTimestamp = 0;
         private long printTimes = 0;
@@ -1035,9 +1050,11 @@ public class CommitLog {
             CommitLog.log.info(this.getServiceName() + " service started");
 
             while (!this.isStopped()) {
+                // 默认为false
                 boolean flushCommitLogTimed = CommitLog.this.defaultMessageStore.getMessageStoreConfig().isFlushCommitLogTimed();
-
+                // interval默认500ms
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushIntervalCommitLog();
+                // 默认的最少刷盘页=4
                 int flushPhysicQueueLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogLeastPages();
 
                 int flushPhysicQueueThoroughInterval =
@@ -1055,6 +1072,7 @@ public class CommitLog {
 
                 try {
                     // 等待被commitLogService服务的线程唤醒
+                    // flushCommitLogService.wakeup();
                     if (flushCommitLogTimed) {
                         Thread.sleep(interval);
                     } else {
@@ -1066,6 +1084,7 @@ public class CommitLog {
                     }
 
                     long begin = System.currentTimeMillis();
+                    // 刷盘点
                     CommitLog.this.mappedFileQueue.flush(flushPhysicQueueLeastPages);
                     long storeTimestamp = CommitLog.this.mappedFileQueue.getStoreTimestamp();
                     if (storeTimestamp > 0) {
@@ -1141,15 +1160,18 @@ public class CommitLog {
     /**
      * GroupCommit Service
      */
+    // 同步刷盘线程
     class GroupCommitService extends FlushCommitLogService {
+        // 写容器
         private volatile List<GroupCommitRequest> requestsWrite = new ArrayList<GroupCommitRequest>();
+        // 读容器
         private volatile List<GroupCommitRequest> requestsRead = new ArrayList<GroupCommitRequest>();
 
         public synchronized void putRequest(final GroupCommitRequest request) {
             synchronized (this.requestsWrite) {
                 this.requestsWrite.add(request);
             }
-            // 此处设计也很精妙，当doCommit()出现消费堆积时，此处不会执行，也就不会发生读写容器的交换
+            // 唤醒刷盘线程
             if (hasNotified.compareAndSet(false, true)) {
                 waitPoint.countDown(); // notify
             }
@@ -1192,6 +1214,7 @@ public class CommitLog {
                 } else {
                     // Because of individual messages is set to not sync flush, it
                     // will come to this process
+                    // 针对要关闭broker的情况
                     CommitLog.this.mappedFileQueue.flush(0);
                 }
             }
@@ -1273,7 +1296,7 @@ public class CommitLog {
             return msgStoreItemMemory;
         }
 
-        //commitlog中真正写入消息的方法，此处只是把消息写入writeBuffer中，并未刷盘
+        //commitlog中真正写入消息的方法，此处只是把消息写入byteBuffer中，并未刷盘
         public AppendMessageResult doAppend(final long fileFromOffset, final ByteBuffer byteBuffer, final int maxBlank,
             final MessageExtBrokerInner msgInner) {
             // STORETIMESTAMP + STOREHOSTADDRESS + OFFSET <br>
@@ -1298,14 +1321,15 @@ public class CommitLog {
                 msgId = MessageDecoder.createMessageId(this.msgIdV6Memory, msgInner.getStoreHostBytes(storeHostHolder), wroteOffset);
             }
 
-            // Record ConsumeQueue information
+            // 记录ConsumeQueue信息,例如topic-0
             keyBuilder.setLength(0);
             keyBuilder.append(msgInner.getTopic());
             keyBuilder.append('-');
             keyBuilder.append(msgInner.getQueueId());
             String key = keyBuilder.toString();
-            //获取目前消息将要写入的ConsumeQueue的最新偏移量(这里的偏移量指的是此ConsumeQueue上存储的消息数量)
+            // 获取将要写入的ConsumeQueue的上,该主题已经存储的消息数量
             Long queueOffset = CommitLog.this.topicQueueTable.get(key);
+            // 表示ConsumeQueue之前未存储该主题的消息
             if (null == queueOffset) {
                 queueOffset = 0L;
                 CommitLog.this.topicQueueTable.put(key, queueOffset);
@@ -1431,7 +1455,7 @@ public class CommitLog {
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
                     // The next update ConsumeQueue information
-                    // 更新ConsumeQueue的偏移量()
+                    // 更新key=topic-0(代表ConsumeQueue)的偏移量,表示在此ConsumeQueue上该主题写入的消息数量
                     CommitLog.this.topicQueueTable.put(key, ++queueOffset);
                     break;
                 default:

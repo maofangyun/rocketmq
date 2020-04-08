@@ -568,15 +568,17 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         long beginTimestampFirst = System.currentTimeMillis();
         long beginTimestampPrev = beginTimestampFirst;
         long endTimestamp = beginTimestampFirst;
-        //获取topic对应的topicPublishInfo
+        //获取topic的路由信息
         TopicPublishInfo topicPublishInfo = this.tryToFindTopicPublishInfo(msg.getTopic());
         if (topicPublishInfo != null && topicPublishInfo.ok()) {
             boolean callTimeout = false;
             MessageQueue mq = null;
             Exception exception = null;
             SendResult sendResult = null;
+            // 同步发送的消息重试次数，非同步的暂时设置为1
             int timesTotal = communicationMode == CommunicationMode.SYNC ? 1 + this.defaultMQProducer.getRetryTimesWhenSendFailed() : 1;
             int times = 0;
+            // brokersSent存储了发送以及重试中所有的brokerName
             String[] brokersSent = new String[timesTotal];
             //消息发送重试
             for (; times < timesTotal; times++) {
@@ -720,7 +722,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         if (topicPublishInfo.isHaveTopicRouterInfo() || topicPublishInfo.ok()) {
             return topicPublishInfo;
         } else {
-            //再查一次，isDefault=true
+            //再查一次，isDefault=true,用默认的主题TBW102更新主题缓存
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic, true, this.defaultMQProducer);
             topicPublishInfo = this.topicPublishInfoTable.get(topic);
             return topicPublishInfo;
@@ -729,6 +731,12 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
     /**
      * 真正的消息发送方法
+     * 首先会获取broker的具体地址，然后和broker建立网络连接，并发送消息
+     * 注意的是，若开启了自动创建主题的功能，首先会通过TBW102获取broker地址，
+     * 并且在requestHeader中会设置topic，在broker端接收到请求之后，在msgCheck()方法中，
+     * 会使用topic查询TopicConfigManager的topicConfigTable的topicConfig是否存在，当不存在时，
+     * 会创建相应的topicConfig，并加入topicConfigTable中，在broker下次向NameSrv心跳传输数据时，
+     * 将该topic注册到NameSrv中，从而完成整个topic的创建到注册的流程
      * */
     private SendResult sendKernelImpl(final Message msg,
         final MessageQueue mq,
@@ -737,11 +745,13 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         final TopicPublishInfo topicPublishInfo,
         final long timeout) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
         long beginStartTime = System.currentTimeMillis();
-        //获取broker的网络地址
+        // 获取broker的网络地址
         String brokerAddr = this.mQClientFactory.findBrokerAddressInPublish(mq.getBrokerName());
         if (null == brokerAddr) {
-            //调用此方法，主动更新一下本地的TopicPublishInfo缓存
+            // 调用此方法，主动更新一下本地的TopicPublishInfo缓存
             tryToFindTopicPublishInfo(mq.getTopic());
+            // 由于上面的方法更新了brokerAddrTable，所以findBrokerAddressInPublish()肯定能返回数据
+            // 而且返回的是Master的Broker地址
             brokerAddr = this.mQClientFactory.findBrokerAddressInPublish(mq.getBrokerName());
         }
 
@@ -862,6 +872,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         if (timeout < costTimeAsync) {
                             throw new RemotingTooMuchRequestException("sendKernelImpl call timeout");
                         }
+                        // 发送消息
+                        // sendMessage中会再次包装一下requestHeader，加上RequestCode，变成RemotingCommand
+                        // 异步消息,sendResult=null
                         sendResult = this.mQClientFactory.getMQClientAPIImpl().sendMessage(
                             brokerAddr,
                             mq.getBrokerName(),
@@ -872,6 +885,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                             sendCallback,
                             topicPublishInfo,
                             this.mQClientFactory,
+                            // 异步发送的消息重试次数
                             this.defaultMQProducer.getRetryTimesWhenSendAsyncFailed(),
                             context,
                             this);
@@ -882,6 +896,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         if (timeout < costTimeSync) {
                             throw new RemotingTooMuchRequestException("sendKernelImpl call timeout");
                         }
+                        // 发送消息
                         sendResult = this.mQClientFactory.getMQClientAPIImpl().sendMessage(
                             brokerAddr,
                             mq.getBrokerName(),

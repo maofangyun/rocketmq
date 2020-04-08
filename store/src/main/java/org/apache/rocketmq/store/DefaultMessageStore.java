@@ -408,6 +408,7 @@ public class DefaultMessageStore implements MessageStore {
         this.storeStatsService.setPutMessageEntireTimeMax(elapsedTime);
 
         if (null == result || !result.isOk()) {
+            // 统计消息存储失败的次数
             this.storeStatsService.getPutMessageFailedTimes().incrementAndGet();
         }
 
@@ -1150,6 +1151,7 @@ public class DefaultMessageStore implements MessageStore {
 
         ConsumeQueue logic = map.get(queueId);
         if (null == logic) {
+            // 当主题对应的消费队列不存在时,新建一个并加入缓存中
             ConsumeQueue newLogic = new ConsumeQueue(
                 topic,
                 queueId,
@@ -1436,6 +1438,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     public void putMessagePositionInfo(DispatchRequest dispatchRequest) {
+        // 根据主题和队列ID返回对应的消费队列,当不存在时,会新建一个
         ConsumeQueue cq = this.findConsumeQueue(dispatchRequest.getTopic(), dispatchRequest.getQueueId());
         cq.putMessagePositionInfoWrapper(dispatchRequest);
     }
@@ -1788,7 +1791,7 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
-    //用来更新ConsumeQueue中消息偏移的
+    // 从commitlog中取数据,分发到consumeQueue和indexFile
     class ReputMessageService extends ServiceThread {
 
         private volatile long reputFromOffset = 0;
@@ -1827,6 +1830,7 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         private void doReput() {
+            // 当reputFromOffset(分发的偏移量累积量)小于commitLog文件的最小偏移量,说明分发的进度落后太多,原commitLog文件已经删除了
             if (this.reputFromOffset < DefaultMessageStore.this.commitLog.getMinOffset()) {
                 log.warn("The reputFromOffset={} is smaller than minPyOffset={}, this usually indicate that the dispatch behind too much and the commitlog has expired.",
                     this.reputFromOffset, DefaultMessageStore.this.commitLog.getMinOffset());
@@ -1844,14 +1848,15 @@ public class DefaultMessageStore implements MessageStore {
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
-                        // 和前面的没变，还是代表commitlog中的物理偏移量
+                        // 和前面的没变，commitlog中的物理偏移量,表示分发的初始位置
                         this.reputFromOffset = result.getStartOffset();
 
                         // result.getSize()表示消息一共有多少字节
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
-                            // 创建分发的请求
+                            // 创建分发的请求,根据commitlog文件的格式进行解析,每次返回一条消息的内容
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
+                            // 此条消息的总长度
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
                             if (dispatchRequest.isSuccess()) {

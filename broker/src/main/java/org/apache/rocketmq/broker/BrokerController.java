@@ -268,6 +268,7 @@ public class BrokerController {
             }
         }
 
+        // 加载磁盘中存储的消息数据
         result = result && this.messageStore.load();
 
         if (result) {

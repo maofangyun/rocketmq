@@ -20,6 +20,11 @@
  */
 package org.apache.rocketmq.common.protocol.route;
 
+/**
+ * 主题与队列关系，记录一个主题的队列分布在哪些Broker上
+ * 表示每个Broker上存在该主题的队列个数
+ * readQueueNums一般应该等于writeQueueNums
+ * */
 public class QueueData implements Comparable<QueueData> {
     private String brokerName;
     private int readQueueNums;

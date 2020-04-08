@@ -611,7 +611,8 @@ public class MQClientInstance {
 
     /**
      * 此处更新TopicRouteInfo，当isDefault=true时，使用默认的主题TBW102获取TopicRouteData
-     * 若NameServer中获取的TopicRouteData和本地缓存topicRouteTable中的不一致，则更新
+     * 若NameServer中获取的TopicRouteData和本地缓存topicRouteTable中的不一致，则更新，
+     * 同时还会更新brokerAddrTable、producerTable和consumerTable缓存
      * */
     public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
         DefaultMQProducer defaultMQProducer) {
@@ -620,8 +621,10 @@ public class MQClientInstance {
                 try {
                     TopicRouteData topicRouteData;
                     if (isDefault && defaultMQProducer != null) {
+                        // 用TBW102主题从NameSrv获取路由信息
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
                             1000 * 3);
+                        // 重置默认的读写队列数=4
                         if (topicRouteData != null) {
                             for (QueueData data : topicRouteData.getQueueDatas()) {
                                 int queueNums = Math.min(defaultMQProducer.getDefaultTopicQueueNums(), data.getReadQueueNums());
@@ -643,7 +646,7 @@ public class MQClientInstance {
 
                         if (changed) {
                             TopicRouteData cloneTopicRouteData = topicRouteData.cloneTopicRouteData();
-
+                            // 更新brokerAddrTable缓存
                             for (BrokerData bd : topicRouteData.getBrokerDatas()) {
                                 this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());
                             }

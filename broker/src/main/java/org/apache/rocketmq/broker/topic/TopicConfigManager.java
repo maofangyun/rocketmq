@@ -66,6 +66,7 @@ public class TopicConfigManager extends ConfigManager {
         }
         {
             // MixAll.AUTO_CREATE_TOPIC_KEY_TOPIC
+            // 只有Broker上的autoCreateTopicEnable = true时，才会将TBW102的主题注册到NameSrv中
             if (this.brokerController.getBrokerConfig().isAutoCreateTopicEnable()) {
                 String topic = MixAll.AUTO_CREATE_TOPIC_KEY_TOPIC;
                 TopicConfig topicConfig = new TopicConfig(topic);

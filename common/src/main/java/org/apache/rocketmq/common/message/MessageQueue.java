@@ -18,7 +18,7 @@ package org.apache.rocketmq.common.message;
 
 import java.io.Serializable;
 /**
- * ConsumeQueue的描述信息
+ * ConsumeQueue的描述信息,一个MessageQueue对应一个ConsumeQueue
  * */
 public class MessageQueue implements Comparable<MessageQueue>, Serializable {
     private static final long serialVersionUID = 6191200464116433425L;

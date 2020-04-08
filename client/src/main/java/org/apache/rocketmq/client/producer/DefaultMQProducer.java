@@ -73,7 +73,8 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     private String producerGroup;
 
     /**
-     * 默认的topic,若autoCreateTopicEnable = true,首次则通过默认的AUTO_CREATE_TOPIC_KEY_TOPIC主题从nameServer中获取broker的相关信息，
+     * 默认的topic,若autoCreateTopicEnable = true,
+     * 首次则通过默认的AUTO_CREATE_TOPIC_KEY_TOPIC主题从nameServer中获取broker的相关信息，
      * 然后broker中生成要创建的topic信息，并注册到nameServer
      * */
     private String createTopicKey = MixAll.AUTO_CREATE_TOPIC_KEY_TOPIC;

@@ -56,7 +56,7 @@ public class MQFaultStrategy {
     }
 
     /**
-     * 当sendLatencyFaultEnable=true时，可以规避宕机的broker
+     * 当sendLatencyFaultEnable=true时，启动broker的故障延迟机制(规避选择到故障的broker)，默认为false
      * */
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
         if (this.sendLatencyFaultEnable) {
