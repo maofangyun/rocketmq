@@ -585,6 +585,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 this.copySubscription();
 
                 if (this.defaultMQPushConsumer.getMessageModel() == MessageModel.CLUSTERING) {
+                    // 当instanceName=DEFAULT或者未指定时，将instanceName置为进程ID
                     this.defaultMQPushConsumer.changeInstanceNameToPID();
                 }
 
@@ -850,6 +851,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 for (final Map.Entry<String, String> entry : sub.entrySet()) {
                     final String topic = entry.getKey();
                     final String subString = entry.getValue();
+                    // 解析subString，并创建SubscriptionData
                     SubscriptionData subscriptionData = FilterAPI.buildSubscriptionData(this.defaultMQPushConsumer.getConsumerGroup(),
                         topic, subString);
                     this.rebalanceImpl.getSubscriptionInner().put(topic, subscriptionData);
@@ -864,6 +866,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 case BROADCASTING:
                     break;
                 case CLUSTERING:    // 只有集群模式时，才会有消息重试的功能
+                    // 构造重试主题并加入负载均衡服务中
                     final String retryTopic = MixAll.getRetryTopic(this.defaultMQPushConsumer.getConsumerGroup());
                     SubscriptionData subscriptionData = FilterAPI.buildSubscriptionData(this.defaultMQPushConsumer.getConsumerGroup(),
                         retryTopic, SubscriptionData.SUB_ALL);

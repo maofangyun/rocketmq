@@ -42,6 +42,7 @@ public class FilterAPI {
         subscriptionData.setTopic(topic);
         subscriptionData.setSubString(subString);
 
+        // 默认订阅主题下的所有tags
         if (null == subString || subString.equals(SubscriptionData.SUB_ALL) || subString.length() == 0) {
             subscriptionData.setSubString(SubscriptionData.SUB_ALL);
         } else {
