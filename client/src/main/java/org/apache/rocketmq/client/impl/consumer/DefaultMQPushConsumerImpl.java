@@ -571,6 +571,8 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
     }
 
+    // 消费者启动的过程,主要是启动了consumeMessageService(消息消费线程服务)和MQClientInstance(与broker通信服务),
+    // 同时配置了rebalanceImpl负载均衡服务
     public synchronized void start() throws MQClientException {
         switch (this.serviceState) {
             case CREATE_JUST:
