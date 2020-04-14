@@ -239,7 +239,7 @@ public class MQClientInstance {
                     // Start various schedule tasks(其中就包括定时的从NameServer中更新生产者和消费者的TopicRouteInfo缓存)
                     this.startScheduledTask();
                     // Start pull service
-                    // 线程的run方法中死循环做守护
+                    // 线程的run方法中死循环做守护,从broker拉取消息的组件
                     this.pullMessageService.start();
                     // Start rebalance service
                     this.rebalanceService.start();
@@ -471,6 +471,7 @@ public class MQClientInstance {
         }
     }
 
+    // 向所有broker发送心跳数据
     public void sendHeartbeatToAllBrokerWithLock() {
         if (this.lockHeartbeat.tryLock()) {
             try {
@@ -993,6 +994,7 @@ public class MQClientInstance {
             MQConsumerInner impl = entry.getValue();
             if (impl != null) {
                 try {
+                    // 代理rebalanceImpl的doRebalance()实现消息消费的负载均衡
                     impl.doRebalance();
                 } catch (Throwable e) {
                     log.error("doRebalance exception", e);

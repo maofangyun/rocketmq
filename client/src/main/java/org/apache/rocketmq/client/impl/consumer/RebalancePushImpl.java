@@ -211,6 +211,7 @@ public class RebalancePushImpl extends RebalanceImpl {
         return result;
     }
 
+    // PullRequest的创建在RebalanceImpl中,然后分发到pullRequestQueue里面
     @Override
     public void dispatchPullRequest(List<PullRequest> pullRequestList) {
         for (PullRequest pullRequest : pullRequestList) {
