@@ -372,6 +372,7 @@ public abstract class RebalanceImpl {
         }
 
         List<PullRequest> pullRequestList = new ArrayList<PullRequest>();
+        // 创建pullRequest
         for (MessageQueue mq : mqSet) {
             if (!this.processQueueTable.containsKey(mq)) {
                 if (isOrder && !this.lock(mq)) {
@@ -383,6 +384,8 @@ public abstract class RebalanceImpl {
                 ProcessQueue pq = new ProcessQueue();
                 long nextOffset = this.computePullFromWhere(mq);
                 if (nextOffset >= 0) {
+                    // 当pq已经存在，不在创建新的pullRequest，表明一个pullRequest会反复使用，
+                    // 同一个消费者拉取的消息全部都存放在pq
                     ProcessQueue pre = this.processQueueTable.putIfAbsent(mq, pq);
                     if (pre != null) {
                         log.info("doRebalance, {}, mq already exists, {}", consumerGroup, mq);
@@ -401,7 +404,8 @@ public abstract class RebalanceImpl {
                 }
             }
         }
-
+        // 分发pullRequest到pullRequestQueue中，只在mq初次拉取消息时使用，之后会定期调用executePullRequestLater方法，
+        // 以此处分发的pullRequest进行消息拉取
         this.dispatchPullRequest(pullRequestList);
 
         return changed;
