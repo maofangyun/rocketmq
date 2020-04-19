@@ -50,9 +50,11 @@ public class AllocateMessageQueueAveragely implements AllocateMessageQueueStrate
                 cidAll);
             return result;
         }
-
+        // 若mqAll=8，cidAll=3，则分配策略是[3,3,2]
         int index = cidAll.indexOf(currentCID);
         int mod = mqAll.size() % cidAll.size();
+        // 当消费者数量大于消费队列数量,averageSize=1
+        // 否则,mqAll.size() / cidAll.size()+ 1 表示为cid最后的分配和其他cid不一样的mq数量
         int averageSize =
             mqAll.size() <= cidAll.size() ? 1 : (mod > 0 && index < mod ? mqAll.size() / cidAll.size()
                 + 1 : mqAll.size() / cidAll.size());

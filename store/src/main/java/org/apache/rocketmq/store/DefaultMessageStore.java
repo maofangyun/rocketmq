@@ -671,6 +671,7 @@ public class DefaultMessageStore implements MessageStore {
         return 0;
     }
 
+    // 查找对应的mq是否存在,若不存在,返回-1;存在,返回最小的消息消费偏移量(除以20)
     public long getMinOffsetInQueue(String topic, int queueId) {
         ConsumeQueue logic = this.findConsumeQueue(topic, queueId);
         if (logic != null) {

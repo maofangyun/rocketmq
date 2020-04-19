@@ -38,6 +38,7 @@ public class RebalanceService extends ServiceThread {
 
         while (!this.isStopped()) {
             this.waitForRunning(waitInterval);
+            // 不断的将pullRequest加入队列中，同时动态调节消费者与MessageQueue的对应数量
             this.mqClientFactory.doRebalance();
         }
 

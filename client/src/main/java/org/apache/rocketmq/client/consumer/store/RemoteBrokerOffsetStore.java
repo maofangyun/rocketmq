@@ -78,6 +78,7 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         if (mq != null) {
             switch (type) {
                 case MEMORY_FIRST_THEN_STORE:
+                // 从offsetTable获取消费进度,即缓存中
                 case READ_FROM_MEMORY: {
                     AtomicLong offset = this.offsetTable.get(mq);
                     if (offset != null) {
@@ -86,6 +87,7 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
                         return -1;
                     }
                 }
+                // 从broker获取消费进度
                 case READ_FROM_STORE: {
                     try {
                         long brokerOffset = this.fetchConsumeOffsetFromBroker(mq);
@@ -94,6 +96,7 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
                         return brokerOffset;
                     }
                     // No offset in broker
+                    // 当ResponseCode不等于SUCCESS时,fetchConsumeOffsetFromBroker()会抛出MQBrokerException
                     catch (MQBrokerException e) {
                         return -1;
                     }
@@ -224,6 +227,7 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         }
     }
 
+    // 从broker中获取该mq的消费进度
     private long fetchConsumeOffsetFromBroker(MessageQueue mq) throws RemotingException, MQBrokerException,
         InterruptedException, MQClientException {
         FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInAdmin(mq.getBrokerName());

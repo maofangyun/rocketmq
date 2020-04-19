@@ -276,8 +276,11 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             }
         } else {
             if (processQueue.isLocked()) {
+                //第一次拉取，计算偏移量
                 if (!pullRequest.isLockedFirst()) {
                     final long offset = this.rebalanceImpl.computePullFromWhere(pullRequest.getMessageQueue());
+                    // pullRequest.getNextOffset()代表了拉取请求中的消息偏移量
+                    // offset表示broker的实际消费偏移量
                     boolean brokerBusy = offset < pullRequest.getNextOffset();
                     log.info("the first time to pull message, so fix offset from broker. pullRequest: {} NewOffset: {} brokerBusy: {}",
                         pullRequest, offset, brokerBusy);
@@ -287,6 +290,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     }
 
                     pullRequest.setLockedFirst(true);
+                    // 将拉取请求的消息偏移量置为broker的实际消费偏移量
                     pullRequest.setNextOffset(offset);
                 }
             } else {
@@ -415,8 +419,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         boolean commitOffsetEnable = false;
         long commitOffsetValue = 0L;
         if (MessageModel.CLUSTERING == this.defaultMQPushConsumer.getMessageModel()) {
+            // 通过offsetStore(本地缓存)获取当前消费进度
             commitOffsetValue = this.offsetStore.readOffset(pullRequest.getMessageQueue(), ReadOffsetType.READ_FROM_MEMORY);
             if (commitOffsetValue > 0) {
+                // 传给Broker，让其判断是否需要保存消费进度
                 commitOffsetEnable = true;
             }
         }
@@ -432,6 +438,8 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             classFilter = sd.isClassFilterMode();
         }
 
+        // 构造一些标志位，这里主要看commitOffsetEnable值
+        // 将commitOffsetEnable放到一个int类型的值中，让broker判断是否需要保存消费进度
         int sysFlag = PullSysFlag.buildSysFlag(
             commitOffsetEnable, // commitOffset
             true, // suspend
@@ -1041,6 +1049,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
     @Override
     public void doRebalance() {
         if (!this.pause) {
+            // 遍历消费者订阅的所有主题,根据主题信息,负载均衡消息队列和消费者的绑定关系
             this.rebalanceImpl.doRebalance(this.isConsumeOrderly());
         }
     }

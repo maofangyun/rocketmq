@@ -115,6 +115,7 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
         return response;
     }
 
+    // 处理消息进度
     private RemotingCommand queryConsumerOffset(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
         final RemotingCommand response =
@@ -126,6 +127,12 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
                 .decodeCommandCustomHeader(QueryConsumerOffsetRequestHeader.class);
 
         long offset =
+                // 消费进度跟topic和group都相关
+                // 当消费进度找不到时,返回-1
+                // offset=-1分为三种情况:
+                //      1.消费组是新上线的
+                //      2.消息队列是新扩容的
+                //      3.消费组新订阅了topic(一般不会发生,消费者上线的时候topic就已经订好,不会更改)
             this.brokerController.getConsumerOffsetManager().queryOffset(
                 requestHeader.getConsumerGroup(), requestHeader.getTopic(), requestHeader.getQueueId());
 
@@ -134,16 +141,20 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
             response.setCode(ResponseCode.SUCCESS);
             response.setRemark(null);
         } else {
+            // 当mq找不到时,返回-1(貌似永远不可能=-1?)
+            // 当minOffset=0,表示还没有一个consumeQueue对应的文件被删除掉
             long minOffset =
                 this.brokerController.getMessageStore().getMinOffsetInQueue(requestHeader.getTopic(),
                     requestHeader.getQueueId());
             if (minOffset <= 0
+                    // 和磁盘中的消费进度做对比
                 && !this.brokerController.getMessageStore().checkInDiskByConsumeOffset(
                 requestHeader.getTopic(), requestHeader.getQueueId(), 0)) {
                 responseHeader.setOffset(0L);
                 response.setCode(ResponseCode.SUCCESS);
                 response.setRemark(null);
             } else {
+                // 通过topic和queueId能查到该消息队列的最小消息消费偏移量,但是offsetTable却查不到消费进度,说明了这个group刚刚上线
                 response.setCode(ResponseCode.QUERY_NOT_FOUND);
                 response.setRemark("Not found, V3_0_6_SNAPSHOT maybe this group consumer boot first");
             }
