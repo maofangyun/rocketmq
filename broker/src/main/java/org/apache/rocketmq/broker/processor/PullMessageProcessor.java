@@ -87,6 +87,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
     public boolean rejectRequest() {
         return false;
     }
+
     // 此处真正处理netty中到来的请求，并将请求pullRequest放入pullRequestTable中
     private RemotingCommand processRequest(final Channel channel, RemotingCommand request, boolean brokerAllowSuspend)
         throws RemotingCommandException {
