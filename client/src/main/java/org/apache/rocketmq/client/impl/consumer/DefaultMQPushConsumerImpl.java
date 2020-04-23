@@ -358,6 +358,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                                     pullResult.getNextBeginOffset(),
                                     firstMsgOffset,
                                     prevRequestOffset);
+
                             }
 
                             break;
