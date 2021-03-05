@@ -495,6 +495,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
      */
     public void send(Message msg,
         SendCallback sendCallback) throws MQClientException, RemotingException, InterruptedException {
+        // 异步发送消息
         send(msg, sendCallback, this.defaultMQProducer.getSendMsgTimeout());
     }
 
@@ -513,6 +514,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         final long beginStartTime = System.currentTimeMillis();
         ExecutorService executor = this.getAsyncSenderExecutor();
         try {
+            // 使用线程池异步执行消息的发送任务
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
@@ -584,7 +586,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             for (; times < timesTotal; times++) {
                 //lastBrokerName表示上一次消息发送失败的broker
                 String lastBrokerName = null == mq ? null : mq.getBrokerName();
-                //从topicPublishInfo中选择一个MessageQueue发送消息
+                //从topicPublishInfo中选择一个MessageQueue发送消息(剔除上一次发送失败的lastBrokerName)
                 MessageQueue mqSelected = this.selectOneMessageQueue(topicPublishInfo, lastBrokerName);
                 if (mqSelected != null) {
                     mq = mqSelected;
@@ -600,7 +602,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                             callTimeout = true;
                             break;
                         }
-
+                        // 真正发送消息的逻辑
                         sendResult = this.sendKernelImpl(msg, mq, communicationMode, sendCallback, topicPublishInfo, timeout - costTime);
                         endTimestamp = System.currentTimeMillis();
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);
@@ -622,6 +624,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         }
                     } catch (RemotingException e) {
                         endTimestamp = System.currentTimeMillis();
+                        // 消息发送失败,记录失败的broker
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);
                         log.warn(String.format("sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s", invokeID, endTimestamp - beginTimestampPrev, mq), e);
                         log.warn(msg.toString());
@@ -629,6 +632,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         continue;
                     } catch (MQClientException e) {
                         endTimestamp = System.currentTimeMillis();
+                        // 消息发送失败,记录失败的broker
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);
                         log.warn(String.format("sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s", invokeID, endTimestamp - beginTimestampPrev, mq), e);
                         log.warn(msg.toString());
@@ -636,6 +640,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         continue;
                     } catch (MQBrokerException e) {
                         endTimestamp = System.currentTimeMillis();
+                        // 消息发送失败,记录失败的broker
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);
                         log.warn(String.format("sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s", invokeID, endTimestamp - beginTimestampPrev, mq), e);
                         log.warn(msg.toString());
@@ -657,6 +662,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         }
                     } catch (InterruptedException e) {
                         endTimestamp = System.currentTimeMillis();
+                        // 消息发送失败,记录失败的broker
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);
                         log.warn(String.format("sendKernelImpl exception, throw exception, InvokeID: %s, RT: %sms, Broker: %s", invokeID, endTimestamp - beginTimestampPrev, mq), e);
                         log.warn(msg.toString());
@@ -714,7 +720,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         TopicPublishInfo topicPublishInfo = this.topicPublishInfoTable.get(topic);
         if (null == topicPublishInfo || !topicPublishInfo.ok()) {
             this.topicPublishInfoTable.putIfAbsent(topic, new TopicPublishInfo());
-            //先直接查，isDefault=false
+            //先直接查，isDefault=false,表示不使用默认主题查
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic);
             topicPublishInfo = this.topicPublishInfoTable.get(topic);
         }
@@ -722,7 +728,8 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         if (topicPublishInfo.isHaveTopicRouterInfo() || topicPublishInfo.ok()) {
             return topicPublishInfo;
         } else {
-            //再查一次，isDefault=true,用默认的主题TBW102更新主题缓存
+            // 能走到这步,说明使用topic没有从NameServer中查到路由信息,那么这个topic肯定是新建的
+            //再查一次,isDefault=true,用默认的主题TBW102查询,然后用查到的路由信息,更新topicPublishInfoTable表
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic, true, this.defaultMQProducer);
             topicPublishInfo = this.topicPublishInfoTable.get(topic);
             return topicPublishInfo;
@@ -873,7 +880,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                             throw new RemotingTooMuchRequestException("sendKernelImpl call timeout");
                         }
                         // 发送消息
-                        // sendMessage中会再次包装一下requestHeader，加上RequestCode，变成RemotingCommand
+                        // sendMessage中会再次包装一下requestHeader,加上RequestCode,变成RemotingCommand
                         // 异步消息,sendResult=null
                         sendResult = this.mQClientFactory.getMQClientAPIImpl().sendMessage(
                             brokerAddr,

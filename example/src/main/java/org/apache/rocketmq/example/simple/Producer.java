@@ -51,9 +51,9 @@ public class Producer {
 class MessageSend {
     public void message(DefaultMQProducer producer,Message msg) throws Exception {
         //1、同步
-        sync(producer,msg);
+        //sync(producer,msg);
         //2、异步
-        //async(producer,msg);
+        async(producer,msg);
         //3、单项发送
         //oneWay(producer,msg);
     }

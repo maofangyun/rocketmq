@@ -267,9 +267,9 @@ public abstract class RebalanceImpl {
                 break;
             }
             case CLUSTERING: {
-                // 获取某topic下所有的消息队列
+                // 获取某topic下所有的消息队列集合
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
-                // 从broker中获取所有订阅了topic主题的consumerGroup消费者
+                // 从broker中获取所有订阅了topic主题的consumerGroup中消费者ID集合
                 List<String> cidAll = this.mQClientFactory.findConsumerIdList(topic, consumerGroup);
                 if (null == mqSet) {
                     if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
@@ -287,12 +287,13 @@ public abstract class RebalanceImpl {
 
                     Collections.sort(mqAll);
                     Collections.sort(cidAll);
-
+                    // 消费者-消费队列分配策略
                     AllocateMessageQueueStrategy strategy = this.allocateMessageQueueStrategy;
 
                     List<MessageQueue> allocateResult = null;
                     try {
                         // 对消费者和MessageQueue进行动态分配并绑定
+                        // 返回当前消费者分配到的MessageQueue集合
                         allocateResult = strategy.allocate(
                             this.consumerGroup,
                             this.mQClientFactory.getClientId(),
@@ -304,7 +305,7 @@ public abstract class RebalanceImpl {
                         return;
                     }
 
-                    // 某一个消费者分配的consumeQueue
+                    // 当前消费者分配的MessageQueue
                     Set<MessageQueue> allocateResultSet = new HashSet<MessageQueue>();
                     if (allocateResult != null) {
                         allocateResultSet.addAll(allocateResult);
@@ -410,8 +411,10 @@ public abstract class RebalanceImpl {
                         log.info("doRebalance, {}, mq already exists, {}", consumerGroup, mq);
                     } else {
                         log.info("doRebalance, {}, add a new mq, {}", consumerGroup, mq);
+                        // 创建新的PullRequest(拉取任务的信息封装),后续加到pullRequestQueue中,去拉取消息
                         PullRequest pullRequest = new PullRequest();
                         pullRequest.setConsumerGroup(consumerGroup);
+                        // 拉取消息的起点
                         pullRequest.setNextOffset(nextOffset);
                         pullRequest.setMessageQueue(mq);
                         pullRequest.setProcessQueue(pq);

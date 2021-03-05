@@ -476,6 +476,7 @@ public class MQClientAPIImpl {
                 if (timeoutMillis < costTimeAsync) {
                     throw new RemotingTooMuchRequestException("sendMessage call timeout");
                 }
+                // 异步发送消息
                 this.sendMessageAsync(addr, brokerName, msg, timeoutMillis - costTimeAsync, request, sendCallback, topicPublishInfo, instance,
                     retryTimesWhenSendFailed, times, context, producer);
                 return null;
@@ -484,6 +485,7 @@ public class MQClientAPIImpl {
                 if (timeoutMillis < costTimeSync) {
                     throw new RemotingTooMuchRequestException("sendMessage call timeout");
                 }
+                // 同步发送消息
                 return this.sendMessageSync(addr, brokerName, msg, timeoutMillis - costTimeSync, request);
             default:
                 assert false;
@@ -548,6 +550,7 @@ public class MQClientAPIImpl {
                         }
 
                         try {
+                            // 异步执行回调方法(成功)
                             sendCallback.onSuccess(sendResult);
                         } catch (Throwable e) {
                         }
@@ -630,6 +633,7 @@ public class MQClientAPIImpl {
             }
 
             try {
+                // 异步执行回调方法(异常)
                 sendCallback.onException(e);
             } catch (Exception ignored) {
             }
@@ -724,6 +728,7 @@ public class MQClientAPIImpl {
                 assert false;
                 return null;
             case ASYNC:
+                // 默认是异步拉取消息
                 this.pullMessageAsync(addr, request, timeoutMillis, pullCallback);
                 return null;
             case SYNC:

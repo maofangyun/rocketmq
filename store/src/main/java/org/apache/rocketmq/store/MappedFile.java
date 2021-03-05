@@ -61,8 +61,8 @@ public class MappedFile extends ReferenceResource {
      * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
      */
     protected ByteBuffer writeBuffer = null;
-    //内存池的优势是集中管理内存的分配和释放，同时提高分配和释放内存的性能，
-    // 很多框架会先预先申请一大块内存，然后通过提供响应的分配 和释放接口来使用内存，这样系统的性能也会打打提高。
+    // 内存池的优势是集中管理内存的分配和释放，同时提高分配和释放内存的性能，
+    // 很多框架会先预先申请一大块内存，然后通过提供相应的分配和释放接口来使用内存，这样系统的性能也会打打提高。
     protected TransientStorePool transientStorePool = null;
     private String fileName;
     //commitlog文件的名称，即每个commitlog文件的起始偏移量
@@ -434,6 +434,7 @@ public class MappedFile extends ReferenceResource {
             if (this.hold()) {
                 ByteBuffer byteBuffer = this.mappedByteBuffer.slice();
                 byteBuffer.position(pos);
+                // commitlog中待分发的消息偏移量
                 int size = readPosition - pos;
                 ByteBuffer byteBufferNew = byteBuffer.slice();
                 byteBufferNew.limit(size);

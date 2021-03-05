@@ -689,16 +689,17 @@ public class CommitLog {
 
 
     public void handleDiskFlush(AppendMessageResult result, PutMessageResult putMessageResult, MessageExt messageExt) {
-        // 同步刷盘，不用走堆外内存，直接由mappedFileBuffer区向commitlog写入数据
+        // 同步刷盘，不用走堆外内存，直接由mappedFileBuffer向commitlog写入数据
         // 同步刷盘其实就是调用了mappedByteBuffer.force()方法
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
             // 在同步刷盘情况下是否需要等待数据落地才认为消息发送成功
             if (messageExt.isWaitStoreMsgOK()) {
-                // result.getWroteOffset() = fileFromOffset + byteBuffer.position();
+                // result.getWroteOffset() = fileFromOffset + byteBuffer.position();此条消息未写入writeBuffer前,writeBuffer的偏移量(累加量)
                 // nextOffset = result.getWroteOffset() + result.getWroteBytes(),
                 // nextOffset表示此条消息写完之后，下条消息的初始写入偏移量(累加量)
                 GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes());
+                // 将消息加入到请求写队列中
                 service.putRequest(request);
                 // 调用waitForFlush()会阻塞5s，由于前面一步调用putRequest(),GroupCommitServic线程会立即执行doCommit()操作，
                 // 将缓冲区的数据刷盘，刷盘完成之后调用wakeupCustomer()，执行countDownLatch.countDown()，waitForFlush将立即返回
@@ -1046,6 +1047,7 @@ public class CommitLog {
         private long lastFlushTimestamp = 0;
         private long printTimes = 0;
 
+        @Override
         public void run() {
             CommitLog.log.info(this.getServiceName() + " service started");
 
@@ -1296,9 +1298,10 @@ public class CommitLog {
             return msgStoreItemMemory;
         }
 
+        @Override
         //commitlog中真正写入消息的方法，此处只是把消息写入byteBuffer中，并未刷盘
         public AppendMessageResult doAppend(final long fileFromOffset, final ByteBuffer byteBuffer, final int maxBlank,
-            final MessageExtBrokerInner msgInner) {
+                                            final MessageExtBrokerInner msgInner) {
             // STORETIMESTAMP + STOREHOSTADDRESS + OFFSET <br>
 
             // PHY OFFSET
@@ -1464,8 +1467,9 @@ public class CommitLog {
             return result;
         }
 
+        @Override
         public AppendMessageResult doAppend(final long fileFromOffset, final ByteBuffer byteBuffer, final int maxBlank,
-            final MessageExtBatch messageExtBatch) {
+                                            final MessageExtBatch messageExtBatch) {
             byteBuffer.mark();
             //physical offset
             long wroteOffset = fileFromOffset + byteBuffer.position();

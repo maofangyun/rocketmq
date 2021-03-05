@@ -621,11 +621,14 @@ public class MQClientInstance {
             if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 try {
                     TopicRouteData topicRouteData;
+                    // 判断是否试用默认主题TBW102从NameServer中获取路由信息
                     if (isDefault && defaultMQProducer != null) {
                         // 用TBW102主题从NameSrv获取路由信息
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
                             1000 * 3);
-                        // 重置默认的读写队列数=4
+                        // 重置默认的读写队列数=4,最佳实践,读写队列数量要相同
+                        // 在消息发送时,使用写队列个数返回路由信息,而消息消费时按照读队列个数返回路由信息
+                        // rocketmq设置读写队列数的目的在于方便队列的缩容和扩容
                         if (topicRouteData != null) {
                             for (QueueData data : topicRouteData.getQueueDatas()) {
                                 int queueNums = Math.min(defaultMQProducer.getDefaultTopicQueueNums(), data.getReadQueueNums());
@@ -634,8 +637,10 @@ public class MQClientInstance {
                             }
                         }
                     } else {
+                        // 使用指定主题从NameServer中获取路由信息
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, 1000 * 3);
                     }
+                    // 根据从NameServer中获取的路由信息,更新该topic的本地路由缓存信息
                     if (topicRouteData != null) {
                         TopicRouteData old = this.topicRouteTable.get(topic);
                         // 判断本地的主题路由信息和NameServer端获取的路由信息是否相等
@@ -653,7 +658,7 @@ public class MQClientInstance {
                                 this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());
                             }
 
-                            // Update Pub info  生产者
+                            // 更新生产者路由信息
                             {
                                 //将TopicRouteData转换成为TopicPublishInfo
                                 TopicPublishInfo publishInfo = topicRouteData2TopicPublishInfo(topic, topicRouteData);
@@ -669,7 +674,7 @@ public class MQClientInstance {
                                 }
                             }
 
-                            // Update sub info     消费者
+                            // 更新消费者路由信息
                             {
                                 Set<MessageQueue> subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);
                                 Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();
@@ -677,6 +682,7 @@ public class MQClientInstance {
                                     Entry<String, MQConsumerInner> entry = it.next();
                                     MQConsumerInner impl = entry.getValue();
                                     if (impl != null) {
+                                        // 更新topicSubscribeInfoTable表
                                         impl.updateTopicSubscribeInfo(topic, subscribeInfo);
                                     }
                                 }
