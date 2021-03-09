@@ -32,6 +32,8 @@ public class PushConsumer {
         consumer.subscribe("TopicTest2", "*");
         consumer.subscribe("TopicTest1", "*");
         consumer.setNamesrvAddr("127.0.0.1:9876");
+        // 消费处理线程每次能消费的消息数量(即msgs的大小),默认是1
+        consumer.setConsumeMessageBatchMaxSize(16);
         consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);
         //wrong time format 2017_0422_221800
         consumer.setConsumeTimestamp("20181109221800");

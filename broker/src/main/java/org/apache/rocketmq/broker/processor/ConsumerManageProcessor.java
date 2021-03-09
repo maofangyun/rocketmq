@@ -115,7 +115,7 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
         return response;
     }
 
-    // 处理消息进度
+    // 查询消息进度
     private RemotingCommand queryConsumerOffset(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
         final RemotingCommand response =

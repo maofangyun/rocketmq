@@ -33,7 +33,7 @@ public class Producer {
         producer.start();
 
         MessageSend messageSend = new MessageSend();
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 32; i++) {
             try {
                 Message msg = new Message("TopicTest1",
                     "TagA",

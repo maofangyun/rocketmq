@@ -357,9 +357,10 @@ public abstract class RebalanceImpl {
             ProcessQueue pq = next.getValue();
 
             if (mq.getTopic().equals(topic)) {
-                // mqSet代表了某个消费者在topic下的分配到的所有mq
+                // mqSet代表了当前消费者在topic下的分配到的所有mq
                 // 此处表示消费者解绑了之前分配的mq
                 if (!mqSet.contains(mq)) {
+                    // 废弃此processQueue,不让当前消费者继续消费不属于自己的processQueue中的消息(负载均衡线程和消息消费线程相互独立)
                     pq.setDropped(true);
                     if (this.removeUnnecessaryMessageQueue(mq, pq)) {
                         // 此处更新processQueueTable
